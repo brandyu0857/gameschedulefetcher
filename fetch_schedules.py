@@ -30,14 +30,15 @@ class Game(TypedDict):
     time: str
     separator: str
     featured: bool
+    series: str
 
 
-def make_game(away: str, home: str, time: str, separator: str = "@", featured: bool = False) -> Game:
-    return {"away": away, "home": home, "time": time, "separator": separator, "featured": featured}
+def make_game(away: str, home: str, time: str, separator: str = "@", featured: bool = False, series: str = "") -> Game:
+    return {"away": away, "home": home, "time": time, "separator": separator, "featured": featured, "series": series}
 
 
 def fetch_mlb(date: str) -> List[Game]:
-    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}"
+    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}&hydrate=seriesStatus"
     data = requests.get(url, timeout=TIMEOUT).json()
     games: List[Game] = []
     for day in data.get("dates", []):
@@ -45,7 +46,13 @@ def fetch_mlb(date: str) -> List[Game]:
             home = g["teams"]["home"]["team"]["name"]
             away = g["teams"]["away"]["team"]["name"]
             featured = home in FEATURED_MLB_TEAMS or away in FEATURED_MLB_TEAMS
-            games.append(make_game(away, home, format_time(g.get("gameDate")), "@", featured))
+            series = ""
+            if g.get("gameType", "R") != "R":
+                status = g.get("seriesStatus") or {}
+                label = g.get("seriesDescription") or ""
+                score = status.get("shortDescription") or status.get("description") or ""
+                series = " · ".join(x for x in (label, score) if x)
+            games.append(make_game(away, home, format_time(g.get("gameDate")), "@", featured, series))
     games.sort(key=lambda x: 0 if x["featured"] else 1)
     return games
 
@@ -62,7 +69,8 @@ def fetch_nba(date: str) -> List[Game]:
         for g in gd.get("games", []):
             away = f"{g['awayTeam']['teamCity']} {g['awayTeam']['teamName']}".strip()
             home = f"{g['homeTeam']['teamCity']} {g['homeTeam']['teamName']}".strip()
-            games.append(make_game(away, home, format_time(g.get("gameDateTimeUTC")), "@"))
+            series = (g.get("seriesText") or "").strip()
+            games.append(make_game(away, home, format_time(g.get("gameDateTimeUTC")), "@", series=series))
     return games
 
 
@@ -74,12 +82,15 @@ def fetch_world_cup(date: str) -> List[Game]:
     data = requests.get(url, timeout=TIMEOUT).json()
     games: List[Game] = []
     for event in data.get("events", []):
-        comps = event.get("competitions", [{}])[0].get("competitors", [])
+        competition = event.get("competitions", [{}])[0]
+        comps = competition.get("competitors", [])
         if len(comps) < 2:
             continue
         home = next((c["team"]["displayName"] for c in comps if c.get("homeAway") == "home"), "")
         away = next((c["team"]["displayName"] for c in comps if c.get("homeAway") == "away"), "")
-        games.append(make_game(away, home, format_time(event.get("date")), "vs"))
+        notes = competition.get("notes") or []
+        stage = notes[0].get("headline", "") if notes else ""
+        games.append(make_game(away, home, format_time(event.get("date")), "vs", series=stage))
     return games
 
 
@@ -102,7 +113,12 @@ def text_section(title: str, games: List[Game] | str) -> str:
         return f"{title}\n  {games}"
     if not games:
         return f"{title}\n  {NO_GAME}"
-    lines = [f"  • {g['away']} {g['separator']} {g['home']} — {g['time']}" for g in games]
+    lines = []
+    for g in games:
+        base = f"  • {g['away']} {g['separator']} {g['home']} — {g['time']}"
+        if g["series"]:
+            base += f"\n      ({g['series']})"
+        lines.append(base)
     return f"{title}\n" + "\n".join(lines)
 
 
@@ -127,6 +143,12 @@ def html_section(title: str, games: List[Game] | str) -> str:
     for g in games:
         bg = "#fffbea" if g["featured"] else "#ffffff"
         weight = "700" if g["featured"] else "400"
+        series_html = ""
+        if g["series"]:
+            series_html = (
+                f'<div style="color:#666;font-size:14px;margin-top:4px;">'
+                f'{html.escape(g["series"])}</div>'
+            )
         rows.append(
             f'<tr><td style="padding:14px 16px;background:{bg};border-bottom:1px solid #eee;'
             f'font:{weight} 17px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#222;">'
@@ -134,6 +156,7 @@ def html_section(title: str, games: List[Game] | str) -> str:
             f'<span style="color:#888;">{html.escape(g["separator"])}</span> '
             f'{html.escape(g["home"])}'
             f'<div style="color:#444;font-size:18px;font-weight:600;margin-top:6px;">{html.escape(g["time"])}</div>'
+            f'{series_html}'
             "</td></tr>"
         )
     table = (
