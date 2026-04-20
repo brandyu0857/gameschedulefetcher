@@ -102,10 +102,7 @@ def text_section(title: str, games: List[Game] | str) -> str:
         return f"{title}\n  {games}"
     if not games:
         return f"{title}\n  {NO_GAME}"
-    lines = []
-    for g in games:
-        tag = " [FEATURED]" if g["featured"] else ""
-        lines.append(f"  • {g['away']} {g['separator']} {g['home']} — {g['time']}{tag}")
+    lines = [f"  • {g['away']} {g['separator']} {g['home']} — {g['time']}" for g in games]
     return f"{title}\n" + "\n".join(lines)
 
 
@@ -128,21 +125,14 @@ def html_section(title: str, games: List[Game] | str) -> str:
         return header + f'<p style="margin:0;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">{NO_GAME}</p>'
     rows = []
     for g in games:
-        badge = ""
-        bg = "#ffffff"
-        if g["featured"]:
-            badge = (
-                '<span style="display:inline-block;margin-left:8px;padding:3px 10px;'
-                'background:#ffd60a;color:#000;border-radius:10px;font:700 12px/1 sans-serif;">'
-                "FEATURED</span>"
-            )
-            bg = "#fffbea"
+        bg = "#fffbea" if g["featured"] else "#ffffff"
+        weight = "700" if g["featured"] else "400"
         rows.append(
             f'<tr><td style="padding:14px 16px;background:{bg};border-bottom:1px solid #eee;'
-            'font:17px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#222;">'
-            f'<strong>{html.escape(g["away"])}</strong> '
+            f'font:{weight} 17px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#222;">'
+            f'{html.escape(g["away"])} '
             f'<span style="color:#888;">{html.escape(g["separator"])}</span> '
-            f'<strong>{html.escape(g["home"])}</strong>{badge}'
+            f'{html.escape(g["home"])}'
             f'<div style="color:#444;font-size:18px;font-weight:600;margin-top:6px;">{html.escape(g["time"])}</div>'
             "</td></tr>"
         )
