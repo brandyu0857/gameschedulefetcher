@@ -7,6 +7,11 @@ on:
     - cron: "0 16 * * *"
     - cron: "0 17 * * *"
   workflow_dispatch:
+    inputs:
+      email_to:
+        description: "Only send to this email (overrides EMAIL_TO secret). Leave blank to use secret."
+        required: false
+        type: string
 
 jobs:
   send:
@@ -25,4 +30,4 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          EMAIL_TO: ${{ inputs.email_to != '' && inputs.email_to || secrets.EMAIL_TO }}
