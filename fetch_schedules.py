@@ -118,32 +118,32 @@ def build_text(date: str, sections: list[tuple[str, List[Game] | str]]) -> str:
 def html_section(title: str, games: List[Game] | str) -> str:
     color = SPORT_COLORS.get(title, "#333")
     header = (
-        f'<h2 style="margin:24px 0 12px;padding:8px 12px;font:600 18px/1.3 -apple-system,'
+        f'<h2 style="margin:28px 0 14px;padding:10px 14px;font:700 22px/1.3 -apple-system,'
         f'Segoe UI,Roboto,sans-serif;color:#fff;background:{color};border-radius:6px;">'
         f"{html.escape(title)}</h2>"
     )
     if isinstance(games, str):
-        return header + f'<p style="margin:0;color:#b00;font:14px/1.5 -apple-system,sans-serif;">{html.escape(games)}</p>'
+        return header + f'<p style="margin:0;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(games)}</p>'
     if not games:
-        return header + f'<p style="margin:0;color:#666;font:italic 14px/1.5 -apple-system,sans-serif;">{NO_GAME}</p>'
+        return header + f'<p style="margin:0;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">{NO_GAME}</p>'
     rows = []
     for g in games:
         badge = ""
         bg = "#ffffff"
         if g["featured"]:
             badge = (
-                '<span style="display:inline-block;margin-left:8px;padding:2px 8px;'
-                'background:#ffd60a;color:#000;border-radius:10px;font:600 11px/1 sans-serif;">'
+                '<span style="display:inline-block;margin-left:8px;padding:3px 10px;'
+                'background:#ffd60a;color:#000;border-radius:10px;font:700 12px/1 sans-serif;">'
                 "FEATURED</span>"
             )
             bg = "#fffbea"
         rows.append(
-            f'<tr><td style="padding:10px 12px;background:{bg};border-bottom:1px solid #eee;'
-            'font:14px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#222;">'
+            f'<tr><td style="padding:14px 16px;background:{bg};border-bottom:1px solid #eee;'
+            'font:17px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#222;">'
             f'<strong>{html.escape(g["away"])}</strong> '
             f'<span style="color:#888;">{html.escape(g["separator"])}</span> '
             f'<strong>{html.escape(g["home"])}</strong>{badge}'
-            f'<div style="color:#666;font-size:12px;margin-top:2px;">{html.escape(g["time"])}</div>'
+            f'<div style="color:#444;font-size:18px;font-weight:600;margin-top:6px;">{html.escape(g["time"])}</div>'
             "</td></tr>"
         )
     table = (
@@ -164,12 +164,12 @@ def build_html(date: str, sections: list[tuple[str, List[Game] | str]]) -> str:
         'style="max-width:600px;width:100%;background:#fff;border-radius:10px;'
         'box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:24px;">'
         '<tr><td>'
-        '<h1 style="margin:0 0 4px;font:700 22px/1.2 -apple-system,Segoe UI,Roboto,sans-serif;color:#111;">'
+        '<h1 style="margin:0 0 6px;font:700 26px/1.2 -apple-system,Segoe UI,Roboto,sans-serif;color:#111;">'
         "Today's Games</h1>"
-        f'<p style="margin:0;color:#666;font:14px/1.4 -apple-system,sans-serif;">{html.escape(date)}</p>'
+        f'<p style="margin:0;color:#666;font:16px/1.4 -apple-system,sans-serif;">{html.escape(date)}</p>'
         f"{body}"
         '<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;'
-        'color:#999;font:12px/1.4 -apple-system,sans-serif;">'
+        'color:#999;font:13px/1.4 -apple-system,sans-serif;">'
         "Sent daily at 12:00 PM Toronto time.</p>"
         "</td></tr></table></td></tr></table></body></html>"
     )
