@@ -131,8 +131,8 @@ def main() -> None:
     if os.environ.get("DRY_RUN") == "1":
         print(body)
         return
-    if os.environ.get("ENFORCE_9AM") == "1" and now.hour != 9:
-        print(f"Skipping: local hour is {now.hour}, not 9.")
+    if os.environ.get("ENFORCE_NOON") == "1" and now.hour != 12:
+        print(f"Skipping: local hour is {now.hour}, not 12.")
         return
     send_email(body, date)
 
