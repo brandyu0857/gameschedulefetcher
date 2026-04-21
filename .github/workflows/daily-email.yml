@@ -3,9 +3,10 @@ name: Daily Games Email
 on:
   schedule:
     # 12:00 PM America/Toronto. EDT=UTC-4 (16:00 UTC), EST=UTC-5 (17:00 UTC).
-    # Run both; the ENFORCE_NOON guard ensures only the local-noon run emails.
-    - cron: "0 16 * * *"
-    - cron: "0 17 * * *"
+    # Offset from :00 to dodge GitHub Actions peak-load delays. ENFORCE_NOON
+    # on the script side still allows an hour slop so a delayed run sends.
+    - cron: "7 16 * * *"
+    - cron: "7 17 * * *"
   workflow_dispatch:
     inputs:
       email_to:
