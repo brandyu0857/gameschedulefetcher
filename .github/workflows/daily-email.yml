@@ -1,12 +1,8 @@
 name: Daily Games Email
 
 on:
-  schedule:
-    # 12:00 PM America/Toronto. EDT=UTC-4 (16:00 UTC), EST=UTC-5 (17:00 UTC).
-    # Offset from :00 to dodge GitHub Actions peak-load delays. ENFORCE_NOON
-    # on the script side still allows an hour slop so a delayed run sends.
-    - cron: "7 16 * * *"
-    - cron: "7 17 * * *"
+  repository_dispatch:
+    types: [daily_email]
   workflow_dispatch:
     inputs:
       email_to:
@@ -25,8 +21,6 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python fetch_schedules.py
         env:
-          ENFORCE_NOON: ${{ github.event_name == 'schedule' && '1' || '0' }}
-          CRON_SCHEDULE: ${{ github.event.schedule }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
