@@ -225,9 +225,13 @@ def main() -> None:
         out = os.environ.get("DRY_RUN_FORMAT", "text")
         print(html_body if out == "html" else text_body)
         return
-    if os.environ.get("ENFORCE_NOON") == "1" and now.hour != 12:
-        print(f"Skipping: local hour is {now.hour}, not 12.")
-        return
+    if os.environ.get("ENFORCE_NOON") == "1":
+        offset_hours = int(tz.utcoffset(now).total_seconds() // 3600)
+        expected = "7 16 * * *" if offset_hours == -4 else "7 17 * * *"
+        fired = os.environ.get("CRON_SCHEDULE", "")
+        if fired != expected:
+            print(f"Skipping: cron {fired!r} is not today's noon cron ({expected!r}).")
+            return
     send_email(text_body, html_body, date)
 
 
