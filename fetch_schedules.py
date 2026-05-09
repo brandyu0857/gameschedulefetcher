@@ -150,7 +150,7 @@ def html_section(title: str, games: List[Game] | str) -> str:
                 f'{html.escape(g["series"])}</div>'
             )
         rows.append(
-            f'<tr><td style="padding:14px 16px;background:{bg};border-bottom:1px solid #eee;'
+            f'<tr><td style="padding:12px 14px;background:{bg};border-bottom:1px solid #eee;'
             f'font:{weight} 17px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#222;">'
             f'{html.escape(g["away"])} '
             f'<span style="color:#888;">{html.escape(g["separator"])}</span> '
@@ -172,10 +172,10 @@ def build_html(date: str, sections: list[tuple[str, List[Game] | str]]) -> str:
     return (
         '<!doctype html><html><body style="margin:0;padding:0;background:#f5f5f7;">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;">'
-        '<tr><td align="center" style="padding:24px 12px;">'
+        '<tr><td align="center" style="padding:16px 4px;">'
         '<table role="presentation" width="600" cellpadding="0" cellspacing="0" '
         'style="max-width:600px;width:100%;background:#fff;border-radius:10px;'
-        'box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:24px;">'
+        'box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px 14px;">'
         '<tr><td>'
         '<h1 style="margin:0 0 6px;font:700 26px/1.2 -apple-system,Segoe UI,Roboto,sans-serif;color:#111;">'
         "Today's Games</h1>"
