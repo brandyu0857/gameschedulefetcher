@@ -16,6 +16,11 @@ import requests
 TIMEOUT = 15
 FEATURED_MLB_TEAMS = {"Toronto Blue Jays", "Los Angeles Dodgers"}
 NO_GAME = "No game happens today"
+USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json, text/plain, */*"}
 
 SPORT_COLORS = {
     "MLB": "#D50032",
@@ -37,9 +42,19 @@ def make_game(away: str, home: str, time: str, separator: str = "@", featured: b
     return {"away": away, "home": home, "time": time, "separator": separator, "featured": featured, "series": series}
 
 
+def _get_json(url: str) -> dict:
+    r = requests.get(url, timeout=TIMEOUT, headers=HEADERS)
+    r.raise_for_status()
+    try:
+        return r.json()
+    except ValueError:
+        snippet = r.text[:200].replace("\n", " ")
+        raise RuntimeError(f"non-JSON response (HTTP {r.status_code}): {snippet!r}")
+
+
 def fetch_mlb(date: str) -> List[Game]:
     url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}&hydrate=seriesStatus"
-    data = requests.get(url, timeout=TIMEOUT).json()
+    data = _get_json(url)
     games: List[Game] = []
     for day in data.get("dates", []):
         for g in day.get("games", []):
@@ -59,7 +74,7 @@ def fetch_mlb(date: str) -> List[Game]:
 
 def fetch_nba(date: str) -> List[Game]:
     url = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json"
-    data = requests.get(url, timeout=TIMEOUT).json()
+    data = _get_json(url)
     target = date.replace("-", "")
     games: List[Game] = []
     for gd in data.get("leagueSchedule", {}).get("gameDates", []):
@@ -79,7 +94,7 @@ def fetch_world_cup(date: str) -> List[Game]:
         "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard"
         f"?dates={date.replace('-', '')}"
     )
-    data = requests.get(url, timeout=TIMEOUT).json()
+    data = _get_json(url)
     games: List[Game] = []
     for event in data.get("events", []):
         competition = event.get("competitions", [{}])[0]
