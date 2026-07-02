@@ -123,11 +123,18 @@ def safe_fetch(fn: Callable[[str], List[Game]], date: str) -> List[Game] | str:
         return f"(error fetching: {e})"
 
 
-def text_section(title: str, games: List[Game] | str) -> str:
+def no_game_msg(title: str, date: str) -> str:
+    month = int(date[5:7])
+    if title == "NBA" and month in (7, 8, 9):
+        return "NBA season has ended. See you next season! 🏀"
+    return NO_GAME
+
+
+def text_section(title: str, games: List[Game] | str, date: str = "") -> str:
     if isinstance(games, str):
         return f"{title}\n  {games}"
     if not games:
-        return f"{title}\n  {NO_GAME}"
+        return f"{title}\n  {no_game_msg(title, date)}"
     lines = []
     for g in games:
         base = f"  • {g['away']} {g['separator']} {g['home']} — {g['time']}"
@@ -139,11 +146,11 @@ def text_section(title: str, games: List[Game] | str) -> str:
 
 def build_text(date: str, sections: list[tuple[str, List[Game] | str]]) -> str:
     parts = [f"Today's Games — {date}"]
-    parts.extend(text_section(t, g) for t, g in sections)
+    parts.extend(text_section(t, g, date) for t, g in sections)
     return "\n\n".join(parts)
 
 
-def html_section(title: str, games: List[Game] | str) -> str:
+def html_section(title: str, games: List[Game] | str, date: str = "") -> str:
     color = SPORT_COLORS.get(title, "#333")
     header = (
         f'<h2 style="margin:28px 0 14px;padding:10px 14px;font:700 22px/1.3 -apple-system,'
@@ -153,7 +160,8 @@ def html_section(title: str, games: List[Game] | str) -> str:
     if isinstance(games, str):
         return header + f'<p style="margin:0;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(games)}</p>'
     if not games:
-        return header + f'<p style="margin:0;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">{NO_GAME}</p>'
+        msg = no_game_msg(title, date)
+        return header + f'<p style="margin:0;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">{html.escape(msg)}</p>'
     rows = []
     for g in games:
         bg = "#fffbea" if g["featured"] else "#ffffff"
@@ -183,7 +191,7 @@ def html_section(title: str, games: List[Game] | str) -> str:
 
 
 def build_html(date: str, sections: list[tuple[str, List[Game] | str]]) -> str:
-    body = "".join(html_section(t, g) for t, g in sections)
+    body = "".join(html_section(t, g, date) for t, g in sections)
     return (
         '<!doctype html><html><body style="margin:0;padding:0;background:#f5f5f7;">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;">'
