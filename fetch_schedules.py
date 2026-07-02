@@ -73,19 +73,22 @@ def fetch_mlb(date: str) -> List[Game]:
 
 
 def fetch_nba(date: str) -> List[Game]:
-    url = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json"
+    url = (
+        "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+        f"?dates={date.replace('-', '')}"
+    )
     data = _get_json(url)
-    target = date.replace("-", "")
     games: List[Game] = []
-    for gd in data.get("leagueSchedule", {}).get("gameDates", []):
-        gd_date = datetime.strptime(gd["gameDate"], "%m/%d/%Y %H:%M:%S").strftime("%Y%m%d")
-        if gd_date != target:
+    for event in data.get("events", []):
+        competition = event.get("competitions", [{}])[0]
+        comps = competition.get("competitors", [])
+        if len(comps) < 2:
             continue
-        for g in gd.get("games", []):
-            away = f"{g['awayTeam']['teamCity']} {g['awayTeam']['teamName']}".strip()
-            home = f"{g['homeTeam']['teamCity']} {g['homeTeam']['teamName']}".strip()
-            series = (g.get("seriesText") or "").strip()
-            games.append(make_game(away, home, format_time(g.get("gameDateTimeUTC")), "@", series=series))
+        home = next((c["team"]["displayName"] for c in comps if c.get("homeAway") == "home"), "")
+        away = next((c["team"]["displayName"] for c in comps if c.get("homeAway") == "away"), "")
+        notes = competition.get("notes") or []
+        series = notes[0].get("headline", "") if notes else ""
+        games.append(make_game(away, home, format_time(event.get("date")), "@", series=series))
     return games
 
 
