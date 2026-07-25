@@ -242,7 +242,6 @@ def main() -> None:
     sections = [
         ("MLB", safe_fetch(fetch_mlb, date)),
         ("NBA", safe_fetch(fetch_nba, date)),
-        ("World Cup", safe_fetch(fetch_world_cup, date)),
     ]
     text_body = build_text(date, sections)
     html_body = build_html(date, sections)
