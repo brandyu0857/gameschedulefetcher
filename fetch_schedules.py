@@ -60,7 +60,9 @@ def fetch_mlb(date: str) -> List[Game]:
         for g in day.get("games", []):
             home = g["teams"]["home"]["team"]["name"]
             away = g["teams"]["away"]["team"]["name"]
-            featured = home in FEATURED_MLB_TEAMS or away in FEATURED_MLB_TEAMS
+            if home not in FEATURED_MLB_TEAMS and away not in FEATURED_MLB_TEAMS:
+                continue
+            featured = True
             series = ""
             if g.get("gameType", "R") != "R":
                 status = g.get("seriesStatus") or {}
@@ -68,7 +70,6 @@ def fetch_mlb(date: str) -> List[Game]:
                 score = status.get("shortDescription") or status.get("description") or ""
                 series = " · ".join(x for x in (label, score) if x)
             games.append(make_game(away, home, format_time(g.get("gameDate")), "@", featured, series))
-    games.sort(key=lambda x: 0 if x["featured"] else 1)
     return games
 
 
@@ -167,8 +168,8 @@ def html_section(title: str, games: List[Game] | str, date: str = "") -> str:
         return header + f'<p style="margin:0;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">{html.escape(msg)}</p>'
     rows = []
     for g in games:
-        bg = "#fffbea" if g["featured"] else "#ffffff"
-        weight = "700" if g["featured"] else "400"
+        bg = "#ffffff"
+        weight = "400"
         series_html = ""
         if g["series"]:
             series_html = (
