@@ -162,10 +162,10 @@ def html_section(title: str, games: List[Game] | str, date: str = "") -> str:
         f"{html.escape(title)}</h2>"
     )
     if isinstance(games, str):
-        return header + f'<p style="margin:0;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(games)}</p>'
+        return header + f'<p style="margin:0;padding:12px 14px;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(games)}</p>'
     if not games:
         msg = no_game_msg(title, date)
-        return header + f'<p style="margin:0;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">{html.escape(msg)}</p>'
+        return header + f'<p style="margin:0;padding:12px 14px;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">{html.escape(msg)}</p>'
     rows = []
     for g in games:
         bg = "#ffffff"
