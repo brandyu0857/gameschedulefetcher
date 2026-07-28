@@ -6,8 +6,11 @@ import html
 import os
 import smtplib
 import ssl
+import urllib.parse
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from email.message import EmailMessage
+from email.utils import parsedate_to_datetime
 from typing import Callable, List, TypedDict
 from zoneinfo import ZoneInfo
 
@@ -113,6 +116,47 @@ def fetch_world_cup(date: str) -> List[Game]:
     return games
 
 
+NEWS_TOPICS = ["Dodgers", "Shohei", "Blue Jays", "Raptors"]
+NEWS_COUNT = 3
+
+
+class NewsItem(TypedDict):
+    title: str
+    url: str
+    source: str
+    published: str
+
+
+def fetch_news() -> List[NewsItem]:
+    seen_urls: set[str] = set()
+    items: List[tuple[datetime, NewsItem]] = []
+    for topic in NEWS_TOPICS:
+        q = urllib.parse.quote(topic)
+        url = f"https://news.google.com/rss/search?q={q}&hl=en-CA&gl=CA&ceid=CA:en"
+        try:
+            r = requests.get(url, timeout=TIMEOUT, headers=HEADERS)
+            r.raise_for_status()
+            root = ET.fromstring(r.content)
+            for item in root.findall("./channel/item"):
+                link = (item.findtext("link") or "").strip()
+                title = (item.findtext("title") or "").strip()
+                pub = (item.findtext("pubDate") or "").strip()
+                source_el = item.find("source")
+                source = source_el.text.strip() if source_el is not None and source_el.text else ""
+                if not link or link in seen_urls:
+                    continue
+                seen_urls.add(link)
+                try:
+                    dt = parsedate_to_datetime(pub)
+                except Exception:
+                    dt = datetime.min.replace(tzinfo=ZoneInfo("UTC"))
+                items.append((dt, {"title": title, "url": link, "source": source, "published": pub}))
+        except Exception:
+            continue
+    items.sort(key=lambda x: x[0], reverse=True)
+    return [item for _, item in items[:NEWS_COUNT]]
+
+
 def format_time(iso: str | None) -> str:
     if not iso:
         return "TBD"
@@ -148,9 +192,41 @@ def text_section(title: str, games: List[Game] | str, date: str = "") -> str:
     return f"{title}\n" + "\n".join(lines)
 
 
-def build_text(date: str, sections: list[tuple[str, List[Game] | str]]) -> str:
+def news_text(items: List[NewsItem]) -> str:
+    if not items:
+        return "Top Stories\n  No news found today."
+    lines = [f"  • {n['title']} ({n['source']})\n    {n['url']}" for n in items]
+    return "Top Stories\n" + "\n".join(lines)
+
+
+def news_html(items: List[NewsItem]) -> str:
+    header = (
+        '<h2 style="margin:28px 0 14px;padding:10px 14px;font:700 22px/1.3 -apple-system,'
+        'Segoe UI,Roboto,sans-serif;color:#fff;background:#2d6a4f;border-radius:6px;">Top Stories</h2>'
+    )
+    if not items:
+        return header + '<p style="margin:0;padding:12px 14px;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">No news found today.</p>'
+    rows = []
+    for n in items:
+        rows.append(
+            f'<tr><td style="padding:12px 14px;border-bottom:1px solid #eee;">'
+            f'<a href="{html.escape(n["url"])}" style="color:#1a0dab;font:600 16px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;">'
+            f'{html.escape(n["title"])}</a>'
+            f'<div style="color:#888;font-size:13px;margin-top:3px;">{html.escape(n["source"])}</div>'
+            f'</td></tr>'
+        )
+    table = (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="border-collapse:collapse;border:1px solid #eee;border-radius:6px;overflow:hidden;">'
+        + "".join(rows) + "</table>"
+    )
+    return header + table
+
+
+def build_text(date: str, sections: list[tuple[str, List[Game] | str]], news: List[NewsItem]) -> str:
     parts = [f"Today's Games — {date}"]
     parts.extend(text_section(t, g, date) for t, g in sections)
+    parts.append(news_text(news))
     return "\n\n".join(parts)
 
 
@@ -194,7 +270,7 @@ def html_section(title: str, games: List[Game] | str, date: str = "") -> str:
     return header + table
 
 
-def build_html(date: str, sections: list[tuple[str, List[Game] | str]]) -> str:
+def build_html(date: str, sections: list[tuple[str, List[Game] | str]], news: List[NewsItem]) -> str:
     body = "".join(html_section(t, g, date) for t, g in sections)
     return (
         '<!doctype html><html><body style="margin:0;padding:0;background:#f5f5f7;">'
@@ -208,6 +284,7 @@ def build_html(date: str, sections: list[tuple[str, List[Game] | str]]) -> str:
         "Today's Games</h1>"
         f'<p style="margin:0;color:#666;font:16px/1.4 -apple-system,sans-serif;">{html.escape(date)}</p>'
         f"{body}"
+        f"{news_html(news)}"
         '<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;'
         'color:#999;font:13px/1.4 -apple-system,sans-serif;">'
         "Sent daily at 12:00 PM Toronto time.</p>"
@@ -244,8 +321,9 @@ def main() -> None:
         ("MLB", safe_fetch(fetch_mlb, date)),
         ("NBA", safe_fetch(fetch_nba, date)),
     ]
-    text_body = build_text(date, sections)
-    html_body = build_html(date, sections)
+    news = fetch_news()
+    text_body = build_text(date, sections, news)
+    html_body = build_html(date, sections, news)
 
     if os.environ.get("DRY_RUN") == "1":
         out = os.environ.get("DRY_RUN_FORMAT", "text")
