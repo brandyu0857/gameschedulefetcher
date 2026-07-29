@@ -116,7 +116,7 @@ def fetch_world_cup(date: str) -> List[Game]:
     return games
 
 
-NEWS_TOPICS = ["Dodgers", "Shohei", "Blue Jays", "Raptors"]
+NEWS_TOPICS = ["Shohei Ohtani"]
 NEWS_COUNT = 3
 
 
@@ -195,15 +195,29 @@ def text_section(title: str, games: List[Game] | str, date: str = "") -> str:
 
 def news_text(items: List[NewsItem]) -> str:
     if not items:
-        return "Top Stories\n  No news found today."
+        return "Shohei News\n  No news found today."
     lines = [f"  • {n['title']} ({n['source']})\n    {n['url']}" for n in items]
-    return "Top Stories\n" + "\n".join(lines)
+    return "Shohei News\n" + "\n".join(lines)
 
 
 def news_html(items: List[NewsItem]) -> str:
     header = (
+        '<style>'
+        '@keyframes shohei-pitch{'
+        '0%{transform:rotate(-20deg) translateY(0)}'
+        '30%{transform:rotate(15deg) translateY(-4px)}'
+        '60%{transform:rotate(-10deg) translateY(2px)}'
+        '100%{transform:rotate(-20deg) translateY(0)}'
+        '}'
+        '.shohei-char{display:inline-block;animation:shohei-pitch 1.8s ease-in-out infinite;'
+        'font-size:26px;line-height:1;vertical-align:middle;margin-left:10px;}'
+        '</style>'
         '<h2 style="margin:28px 0 14px;padding:10px 14px;font:700 22px/1.3 -apple-system,'
-        'Segoe UI,Roboto,sans-serif;color:#fff;background:#2d6a4f;border-radius:6px;">Top Stories</h2>'
+        'Segoe UI,Roboto,sans-serif;color:#fff;background:#1a3a5c;border-radius:6px;'
+        'display:flex;align-items:center;justify-content:space-between;">'
+        'Shohei News'
+        '<span class="shohei-char">⚾</span>'
+        '</h2>'
     )
     if not items:
         return header + '<p style="margin:0;padding:12px 14px;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">No news found today.</p>'
