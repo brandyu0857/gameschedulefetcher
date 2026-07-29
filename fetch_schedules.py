@@ -150,7 +150,8 @@ def fetch_news() -> List[NewsItem]:
                     dt = parsedate_to_datetime(pub)
                 except Exception:
                     dt = datetime.min.replace(tzinfo=ZoneInfo("UTC"))
-                items.append((dt, {"title": title, "url": link, "source": source, "published": pub}))
+                clean_title = title.rsplit(" - ", 1)[0].strip() if " - " in title else title
+                items.append((dt, {"title": clean_title, "url": link, "source": source, "published": pub}))
         except Exception:
             continue
     items.sort(key=lambda x: x[0], reverse=True)
@@ -210,7 +211,7 @@ def news_html(items: List[NewsItem]) -> str:
     for n in items:
         rows.append(
             f'<tr><td style="padding:12px 14px;border-bottom:1px solid #eee;">'
-            f'<a href="{html.escape(n["url"])}" style="color:#1a0dab;font:600 16px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;">'
+            f'<a href="{html.escape(n["url"])}" style="color:#2c5f8a;font:600 16px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;">'
             f'{html.escape(n["title"])}</a>'
             f'<div style="color:#888;font-size:13px;margin-top:3px;">{html.escape(n["source"])}</div>'
             f'</td></tr>'
