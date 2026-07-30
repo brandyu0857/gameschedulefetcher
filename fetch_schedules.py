@@ -122,9 +122,24 @@ NEWS_COUNT = 3
 
 class NewsItem(TypedDict):
     title: str
+    title_zh: str
     url: str
     source: str
     published: str
+
+
+def translate_zh(text: str) -> str:
+    try:
+        q = urllib.parse.quote(text)
+        r = requests.get(
+            f"https://api.mymemory.translated.net/get?q={q}&langpair=en|zh-CN",
+            timeout=10,
+            headers=HEADERS,
+        )
+        data = r.json()
+        return data["responseData"]["translatedText"] or text
+    except Exception:
+        return text
 
 
 def fetch_news() -> List[NewsItem]:
@@ -151,7 +166,8 @@ def fetch_news() -> List[NewsItem]:
                 except Exception:
                     dt = datetime.min.replace(tzinfo=ZoneInfo("UTC"))
                 clean_title = title.rsplit(" - ", 1)[0].strip() if " - " in title else title
-                items.append((dt, {"title": clean_title, "url": link, "source": source, "published": pub}))
+                title_zh = translate_zh(clean_title)
+                items.append((dt, {"title": clean_title, "title_zh": title_zh, "url": link, "source": source, "published": pub}))
         except Exception:
             continue
     items.sort(key=lambda x: x[0], reverse=True)
@@ -196,7 +212,7 @@ def text_section(title: str, games: List[Game] | str, date: str = "") -> str:
 def news_text(items: List[NewsItem]) -> str:
     if not items:
         return "Shohei News\n  No news found today."
-    lines = [f"  • {n['title']} ({n['source']})\n    {n['url']}" for n in items]
+    lines = [f"  • {n['title']}\n    {n['title_zh']} ({n['source']})\n    {n['url']}" for n in items]
     return "Shohei News\n" + "\n".join(lines)
 
 
@@ -227,7 +243,8 @@ def news_html(items: List[NewsItem]) -> str:
             f'<tr><td style="padding:12px 14px;border-bottom:1px solid #eee;">'
             f'<a href="{html.escape(n["url"])}" style="color:#2c5f8a;font:600 16px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;">'
             f'{html.escape(n["title"])}</a>'
-            f'<div style="color:#888;font-size:13px;margin-top:3px;">{html.escape(n["source"])}</div>'
+            f'<div style="color:#555;font-size:14px;margin-top:4px;">{html.escape(n["title_zh"])}</div>'
+            f'<div style="color:#aaa;font-size:12px;margin-top:2px;">{html.escape(n["source"])}</div>'
             f'</td></tr>'
         )
     table = (
