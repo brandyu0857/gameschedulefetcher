@@ -217,22 +217,22 @@ def news_text(items: List[NewsItem]) -> str:
 
 
 def news_html(items: List[NewsItem]) -> str:
+    polaroid = (
+        '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
+        'box-shadow:2px 3px 8px rgba(0,0,0,0.45);transform:rotate(4deg);'
+        'border-radius:2px;vertical-align:middle;margin-left:10px;flex-shrink:0;">'
+        '<img src="https://img.mlbstatic.com/mlb-photos/image/upload/'
+        'd_people:generic:headshot:67:current.png/w_120,q_auto:best/'
+        'v1/people/660271/headshot/67/current" '
+        'width="55" height="55" style="display:block;object-fit:cover;" alt="Shohei"/>'
+        '</div>'
+    )
     header = (
-        '<style>'
-        '@keyframes shohei-pitch{'
-        '0%{transform:rotate(-20deg) translateY(0)}'
-        '30%{transform:rotate(15deg) translateY(-4px)}'
-        '60%{transform:rotate(-10deg) translateY(2px)}'
-        '100%{transform:rotate(-20deg) translateY(0)}'
-        '}'
-        '.shohei-char{display:inline-block;animation:shohei-pitch 1.8s ease-in-out infinite;'
-        'font-size:26px;line-height:1;vertical-align:middle;margin-left:10px;}'
-        '</style>'
         '<h2 style="margin:28px 0 14px;padding:10px 14px;font:700 22px/1.3 -apple-system,'
         'Segoe UI,Roboto,sans-serif;color:#fff;background:#1a3a5c;border-radius:6px;'
         'display:flex;align-items:center;justify-content:space-between;">'
         'Shohei News'
-        '<span class="shohei-char">⚾</span>'
+        f'{polaroid}'
         '</h2>'
     )
     if not items:
