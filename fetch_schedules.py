@@ -216,14 +216,36 @@ def news_text(items: List[NewsItem]) -> str:
     return "Shohei News\n" + "\n".join(lines)
 
 
-def news_html(items: List[NewsItem]) -> str:
+SHOHEI_PHOTOS = [
+    # MLB official headshot
+    "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/660271/headshot/67/current",
+    # ESPN headshot
+    "https://a.espncdn.com/i/headshots/mlb/players/full/32112.png",
+    # MLB action shot
+    "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:action:67:current.png/w_213,q_auto:best/v1/people/660271/action/67/current",
+    # Wikimedia Commons — 2023 WBC (CC-BY-SA)
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Shohei_Ohtani_2023_WBC.jpg/240px-Shohei_Ohtani_2023_WBC.jpg",
+    # Wikimedia Commons — Dodgers 2024 (CC-BY-SA)
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Shohei_Ohtani_-_Los_Angeles_Dodgers_%282024%29.jpg/240px-Shohei_Ohtani_-_Los_Angeles_Dodgers_%282024%29.jpg",
+    # MLB bust shot
+    "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:83:current.png/w_213,q_auto:best/v1/people/660271/headshot/83/current",
+    # ESPN full body
+    "https://a.espncdn.com/combiner/i?img=/i/headshots/mlb/players/full/32112.png&w=350&h=254",
+]
+
+
+def pick_shohei_photo(date: str) -> str:
+    day = int(date.replace("-", ""))
+    return SHOHEI_PHOTOS[day % len(SHOHEI_PHOTOS)]
+
+
+def news_html(items: List[NewsItem], date: str = "") -> str:
+    photo_url = pick_shohei_photo(date) if date else SHOHEI_PHOTOS[0]
     polaroid = (
         '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
         'box-shadow:2px 3px 8px rgba(0,0,0,0.45);transform:rotate(4deg);'
         'border-radius:2px;vertical-align:middle;margin-left:10px;flex-shrink:0;">'
-        '<img src="https://img.mlbstatic.com/mlb-photos/image/upload/'
-        'd_people:generic:headshot:67:current.png/w_120,q_auto:best/'
-        'v1/people/660271/headshot/67/current" '
+        f'<img src="{photo_url}" '
         'width="55" height="55" style="display:block;object-fit:cover;" alt="Shohei"/>'
         '</div>'
     )
@@ -321,7 +343,7 @@ def build_html(date: str, sections: list[tuple[str, List[Game] | str]], news: Li
         "Today's Games</h1>"
         f'<p style="margin:0;color:#666;font:16px/1.4 -apple-system,sans-serif;">{html.escape(date)}</p>'
         f"{body}"
-        f"{news_html(news)}"
+        f"{news_html(news, date)}"
         '<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;'
         'color:#999;font:13px/1.4 -apple-system,sans-serif;">'
         "Sent daily at 12:00 PM Toronto time.</p>"
