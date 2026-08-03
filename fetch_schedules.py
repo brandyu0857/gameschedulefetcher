@@ -228,12 +228,17 @@ def news_html(items: List[NewsItem]) -> str:
         '</div>'
     )
     header = (
-        '<h2 style="margin:28px 0 14px;padding:10px 14px;font:700 22px/1.3 -apple-system,'
-        'Segoe UI,Roboto,sans-serif;color:#fff;background:#1a3a5c;border-radius:6px;'
-        'display:flex;align-items:center;justify-content:space-between;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="margin:28px 0 14px;background:#1a3a5c;border-radius:6px;overflow:hidden;">'
+        '<tr>'
+        '<td style="padding:10px 14px;font:700 22px/1.3 -apple-system,Segoe UI,Roboto,sans-serif;color:#fff;vertical-align:middle;">'
         'Shohei News'
+        '</td>'
+        f'<td style="padding:8px 12px 8px 0;text-align:right;vertical-align:middle;width:75px;">'
         f'{polaroid}'
-        '</h2>'
+        '</td>'
+        '</tr>'
+        '</table>'
     )
     if not items:
         return header + '<p style="margin:0;padding:12px 14px;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">No news found today.</p>'
