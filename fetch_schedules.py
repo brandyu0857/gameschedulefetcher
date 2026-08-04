@@ -245,7 +245,7 @@ def news_html(items: List[NewsItem], date: str = "") -> str:
         '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
         'box-shadow:2px 3px 8px rgba(0,0,0,0.45);transform:rotate(4deg);'
         'border-radius:2px;vertical-align:middle;margin-left:10px;flex-shrink:0;">'
-        f'<img src="{photo_url}" '
+        f'<img src="{html.escape(photo_url)}" '
         'width="55" height="55" style="display:block;object-fit:cover;" alt="Shohei"/>'
         '</div>'
     )
