@@ -27,3 +27,4 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_TO: ${{ inputs.email_to != '' && inputs.email_to || secrets.EMAIL_TO }}
+          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}

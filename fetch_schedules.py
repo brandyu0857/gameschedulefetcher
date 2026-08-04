@@ -129,15 +129,18 @@ class NewsItem(TypedDict):
 
 
 def translate_zh(text: str) -> str:
+    api_key = os.environ.get("DEEPL_API_KEY")
+    if not api_key:
+        return text
     try:
-        q = urllib.parse.quote(text)
-        r = requests.get(
-            f"https://api.mymemory.translated.net/get?q={q}&langpair=en|zh-CN",
+        r = requests.post(
+            "https://api-free.deepl.com/v2/translate",
+            headers={"Authorization": f"DeepL-Auth-Key {api_key}"},
+            data={"text": text, "target_lang": "ZH"},
             timeout=10,
-            headers=HEADERS,
         )
         data = r.json()
-        return data["responseData"]["translatedText"] or text
+        return data["translations"][0]["text"]
     except Exception:
         return text
 
