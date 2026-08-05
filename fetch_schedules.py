@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import os
+import random
 import smtplib
 import ssl
 import urllib.parse
@@ -82,22 +83,16 @@ def fetch_mlb(date: str) -> List[Game]:
 
 
 def fetch_nba(date: str) -> List[Game]:
-    url = (
-        "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-        f"?dates={date.replace('-', '')}"
-    )
+    url = "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json"
     data = _get_json(url)
     games: List[Game] = []
-    for event in data.get("events", []):
-        competition = event.get("competitions", [{}])[0]
-        comps = competition.get("competitors", [])
-        if len(comps) < 2:
-            continue
-        home = next((c["team"]["displayName"] for c in comps if c.get("homeAway") == "home"), "")
-        away = next((c["team"]["displayName"] for c in comps if c.get("homeAway") == "away"), "")
-        notes = competition.get("notes") or []
-        series = notes[0].get("headline", "") if notes else ""
-        games.append(make_game(away, home, format_time(event.get("date")), "@", series=series))
+    for g in data.get("scoreboard", {}).get("games", []):
+        home = g.get("homeTeam", {})
+        away = g.get("awayTeam", {})
+        home_name = f"{home.get('teamCity', '')} {home.get('teamName', '')}".strip()
+        away_name = f"{away.get('teamCity', '')} {away.get('teamName', '')}".strip()
+        series = g.get("seriesText", "") or ""
+        games.append(make_game(away_name, home_name, format_time(g.get("gameTimeUTC")), "@", series=series))
     return games
 
 
@@ -246,8 +241,7 @@ SHOHEI_PHOTOS = [
 
 
 def pick_shohei_photo(date: str) -> str:
-    day = int(date.replace("-", ""))
-    return SHOHEI_PHOTOS[day % len(SHOHEI_PHOTOS)]
+    return random.Random(date).choice(SHOHEI_PHOTOS)
 
 
 def news_html(items: List[NewsItem], date: str = "") -> str:
