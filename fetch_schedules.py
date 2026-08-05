@@ -23,7 +23,12 @@ USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
-HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json, text/plain, */*"}
+HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://www.espn.com/",
+    "Origin": "https://www.espn.com",
+}
 
 SPORT_COLORS = {
     "MLB": "#D50032",
@@ -184,10 +189,13 @@ def format_time(iso: str | None) -> str:
     return dt.strftime("%-I:%M %p ET")
 
 
-def safe_fetch(fn: Callable[[str], List[Game]], date: str) -> List[Game] | str:
+def safe_fetch(fn: Callable[[str], List[Game]], date: str, title: str = "") -> List[Game] | str:
     try:
         return fn(date)
     except Exception as e:
+        month = int(date[5:7])
+        if title == "NBA" and month in (7, 8, 9):
+            return []
         return f"(error fetching: {e})"
 
 
@@ -381,7 +389,7 @@ def main() -> None:
     date = now.strftime("%Y-%m-%d")
     sections = [
         ("MLB", safe_fetch(fetch_mlb, date)),
-        ("NBA", safe_fetch(fetch_nba, date)),
+        ("NBA", safe_fetch(fetch_nba, date, "NBA")),
     ]
     news = fetch_news()
     text_body = build_text(date, sections, news)
