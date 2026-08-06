@@ -82,7 +82,27 @@ def fetch_mlb(date: str) -> List[Game]:
     return games
 
 
-def fetch_nba(date: str) -> List[Game]:
+def _fetch_nba_espn(date: str) -> List[Game]:
+    url = (
+        "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+        f"?dates={date.replace('-', '')}"
+    )
+    data = _get_json(url)
+    games: List[Game] = []
+    for event in data.get("events", []):
+        competition = event.get("competitions", [{}])[0]
+        comps = competition.get("competitors", [])
+        if len(comps) < 2:
+            continue
+        home = next((c["team"]["displayName"] for c in comps if c.get("homeAway") == "home"), "")
+        away = next((c["team"]["displayName"] for c in comps if c.get("homeAway") == "away"), "")
+        notes = competition.get("notes") or []
+        series = notes[0].get("headline", "") if notes else ""
+        games.append(make_game(away, home, format_time(event.get("date")), "@", series=series))
+    return games
+
+
+def _fetch_nba_cdn(date: str) -> List[Game]:
     url = "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json"
     data = _get_json(url)
     games: List[Game] = []
@@ -94,6 +114,13 @@ def fetch_nba(date: str) -> List[Game]:
         series = g.get("seriesText", "") or ""
         games.append(make_game(away_name, home_name, format_time(g.get("gameTimeUTC")), "@", series=series))
     return games
+
+
+def fetch_nba(date: str) -> List[Game]:
+    try:
+        return _fetch_nba_espn(date)
+    except Exception:
+        return _fetch_nba_cdn(date)
 
 
 def fetch_world_cup(date: str) -> List[Game]:
