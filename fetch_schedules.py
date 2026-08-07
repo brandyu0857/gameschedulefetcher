@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import os
+import random
 import smtplib
 import ssl
 import urllib.parse
@@ -23,7 +24,12 @@ USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
-HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json, text/plain, */*"}
+HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://www.espn.com/",
+    "Origin": "https://www.espn.com",
+}
 
 SPORT_COLORS = {
     "MLB": "#D50032",
@@ -76,7 +82,7 @@ def fetch_mlb(date: str) -> List[Game]:
     return games
 
 
-def fetch_nba(date: str) -> List[Game]:
+def _fetch_nba_espn(date: str) -> List[Game]:
     url = (
         "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
         f"?dates={date.replace('-', '')}"
@@ -94,6 +100,27 @@ def fetch_nba(date: str) -> List[Game]:
         series = notes[0].get("headline", "") if notes else ""
         games.append(make_game(away, home, format_time(event.get("date")), "@", series=series))
     return games
+
+
+def _fetch_nba_cdn(date: str) -> List[Game]:
+    url = "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json"
+    data = _get_json(url)
+    games: List[Game] = []
+    for g in data.get("scoreboard", {}).get("games", []):
+        home = g.get("homeTeam", {})
+        away = g.get("awayTeam", {})
+        home_name = f"{home.get('teamCity', '')} {home.get('teamName', '')}".strip()
+        away_name = f"{away.get('teamCity', '')} {away.get('teamName', '')}".strip()
+        series = g.get("seriesText", "") or ""
+        games.append(make_game(away_name, home_name, format_time(g.get("gameTimeUTC")), "@", series=series))
+    return games
+
+
+def fetch_nba(date: str) -> List[Game]:
+    try:
+        return _fetch_nba_espn(date)
+    except Exception:
+        return _fetch_nba_cdn(date)
 
 
 def fetch_world_cup(date: str) -> List[Game]:
@@ -129,15 +156,18 @@ class NewsItem(TypedDict):
 
 
 def translate_zh(text: str) -> str:
+    api_key = os.environ.get("DEEPL_API_KEY")
+    if not api_key:
+        return text
     try:
-        q = urllib.parse.quote(text)
-        r = requests.get(
-            f"https://api.mymemory.translated.net/get?q={q}&langpair=en|zh-CN",
+        r = requests.post(
+            "https://api-free.deepl.com/v2/translate",
+            headers={"Authorization": f"DeepL-Auth-Key {api_key}"},
+            data={"text": text, "target_lang": "ZH"},
             timeout=10,
-            headers=HEADERS,
         )
         data = r.json()
-        return data["responseData"]["translatedText"] or text
+        return data["translations"][0]["text"]
     except Exception:
         return text
 
@@ -181,10 +211,13 @@ def format_time(iso: str | None) -> str:
     return dt.strftime("%-I:%M %p ET")
 
 
-def safe_fetch(fn: Callable[[str], List[Game]], date: str) -> List[Game] | str:
+def safe_fetch(fn: Callable[[str], List[Game]], date: str, title: str = "") -> List[Game] | str:
     try:
         return fn(date)
     except Exception as e:
+        month = int(date[5:7])
+        if title == "NBA" and month in (7, 8, 9):
+            return []
         return f"(error fetching: {e})"
 
 
@@ -235,8 +268,7 @@ SHOHEI_PHOTOS = [
 
 
 def pick_shohei_photo(date: str) -> str:
-    day = int(date.replace("-", ""))
-    return SHOHEI_PHOTOS[day % len(SHOHEI_PHOTOS)]
+    return random.Random(date).choice(SHOHEI_PHOTOS)
 
 
 def news_html(items: List[NewsItem], date: str = "") -> str:
@@ -245,7 +277,7 @@ def news_html(items: List[NewsItem], date: str = "") -> str:
         '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
         'box-shadow:2px 3px 8px rgba(0,0,0,0.45);transform:rotate(4deg);'
         'border-radius:2px;vertical-align:middle;margin-left:10px;flex-shrink:0;">'
-        f'<img src="{photo_url}" '
+        f'<img src="{html.escape(photo_url)}" '
         'width="55" height="55" style="display:block;object-fit:cover;" alt="Shohei"/>'
         '</div>'
     )
@@ -378,7 +410,7 @@ def main() -> None:
     date = now.strftime("%Y-%m-%d")
     sections = [
         ("MLB", safe_fetch(fetch_mlb, date)),
-        ("NBA", safe_fetch(fetch_nba, date)),
+        ("NBA", safe_fetch(fetch_nba, date, "NBA")),
     ]
     news = fetch_news()
     text_body = build_text(date, sections, news)
