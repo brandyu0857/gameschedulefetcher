@@ -247,20 +247,14 @@ def news_text(items: List[NewsItem]) -> str:
 
 
 SHOHEI_PHOTOS = [
-    # MLB official headshot
+    # MLB official headshot — always serves his current photo
     "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/660271/headshot/67/current",
-    # ESPN headshot
-    "https://a.espncdn.com/i/headshots/mlb/players/full/32112.png",
-    # MLB action shot
-    "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:action:67:current.png/w_213,q_auto:best/v1/people/660271/action/67/current",
+    # MLB bust shot — same reliable Cloudinary pattern, different crop
+    "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:83:current.png/w_213,q_auto:best/v1/people/660271/headshot/83/current",
     # Wikimedia Commons — 2023 WBC (CC-BY-SA)
     "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Shohei_Ohtani_2023_WBC.jpg/240px-Shohei_Ohtani_2023_WBC.jpg",
     # Wikimedia Commons — Dodgers 2024 (CC-BY-SA)
     "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Shohei_Ohtani_-_Los_Angeles_Dodgers_%282024%29.jpg/240px-Shohei_Ohtani_-_Los_Angeles_Dodgers_%282024%29.jpg",
-    # MLB bust shot
-    "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:83:current.png/w_213,q_auto:best/v1/people/660271/headshot/83/current",
-    # ESPN full body
-    "https://a.espncdn.com/combiner/i?img=/i/headshots/mlb/players/full/32112.png&w=350&h=254",
 ]
 
 
