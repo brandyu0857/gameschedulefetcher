@@ -262,16 +262,39 @@ def pick_shohei_photo(date: str) -> str:
     return random.Random(date).choice(SHOHEI_PHOTOS)
 
 
-def news_html(items: List[NewsItem], date: str = "") -> str:
-    photo_url = pick_shohei_photo(date) if date else SHOHEI_PHOTOS[0]
-    polaroid = (
-        '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
-        'box-shadow:2px 3px 8px rgba(0,0,0,0.45);transform:rotate(4deg);'
-        'border-radius:2px;vertical-align:middle;margin-left:10px;flex-shrink:0;">'
-        f'<img src="{html.escape(photo_url)}" '
-        'width="55" height="55" style="display:block;object-fit:cover;" alt="Shohei"/>'
-        '</div>'
-    )
+SHOHEI_PHOTO_CID = "shohei_photo"
+
+
+def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
+    """Fetch the day's Shohei photo bytes server-side, trying every pool
+    photo (starting from the day's pick) until one succeeds, so a broken
+    or hotlink-blocked source doesn't break the embedded image."""
+    first = pick_shohei_photo(date)
+    ordered = [first] + [u for u in SHOHEI_PHOTOS if u != first]
+    for url in ordered:
+        try:
+            r = requests.get(url, timeout=TIMEOUT, headers=HEADERS)
+            r.raise_for_status()
+            content_type = r.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
+            subtype = content_type.split("/", 1)[1] if "/" in content_type else "jpeg"
+            return r.content, subtype
+        except Exception:
+            continue
+    return None
+
+
+def news_html(items: List[NewsItem], has_photo: bool = True) -> str:
+    if has_photo:
+        polaroid = (
+            '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
+            'box-shadow:2px 3px 8px rgba(0,0,0,0.45);transform:rotate(4deg);'
+            'border-radius:2px;vertical-align:middle;margin-left:10px;flex-shrink:0;">'
+            f'<img src="cid:{SHOHEI_PHOTO_CID}" '
+            'width="55" height="55" style="display:block;object-fit:cover;" alt="Shohei"/>'
+            '</div>'
+        )
+    else:
+        polaroid = ""
     header = (
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
         'style="margin:28px 0 14px;background:#1a3a5c;border-radius:6px;overflow:hidden;">'
@@ -352,7 +375,7 @@ def html_section(title: str, games: List[Game] | str, date: str = "") -> str:
     return header + table
 
 
-def build_html(date: str, sections: list[tuple[str, List[Game] | str]], news: List[NewsItem]) -> str:
+def build_html(date: str, sections: list[tuple[str, List[Game] | str]], news: List[NewsItem], has_photo: bool = True) -> str:
     body = "".join(html_section(t, g, date) for t, g in sections)
     return (
         '<!doctype html><html><body style="margin:0;padding:0;background:#f5f5f7;">'
@@ -366,7 +389,7 @@ def build_html(date: str, sections: list[tuple[str, List[Game] | str]], news: Li
         "Today's Games</h1>"
         f'<p style="margin:0;color:#666;font:16px/1.4 -apple-system,sans-serif;">{html.escape(date)}</p>'
         f"{body}"
-        f"{news_html(news, date)}"
+        f"{news_html(news, has_photo)}"
         '<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;'
         'color:#999;font:13px/1.4 -apple-system,sans-serif;">'
         "Sent daily at 12:00 PM Toronto time.</p>"
@@ -374,7 +397,7 @@ def build_html(date: str, sections: list[tuple[str, List[Game] | str]], news: Li
     )
 
 
-def send_email(text_body: str, html_body: str, date: str) -> None:
+def send_email(text_body: str, html_body: str, date: str, photo: tuple[bytes, str] | None) -> None:
     host = os.environ["SMTP_HOST"]
     port = int(os.environ.get("SMTP_PORT", "587"))
     user = os.environ["SMTP_USER"]
@@ -388,6 +411,11 @@ def send_email(text_body: str, html_body: str, date: str) -> None:
     msg["To"] = ", ".join(recipients)
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
+
+    if photo:
+        photo_bytes, subtype = photo
+        html_part = msg.get_payload()[1]
+        html_part.add_related(photo_bytes, maintype="image", subtype=subtype, cid=f"<{SHOHEI_PHOTO_CID}>")
 
     with smtplib.SMTP(host, port) as s:
         s.starttls(context=ssl.create_default_context())
@@ -404,14 +432,15 @@ def main() -> None:
         ("NBA", safe_fetch(fetch_nba, date, "NBA")),
     ]
     news = fetch_news()
+    photo = fetch_shohei_photo(date)
     text_body = build_text(date, sections, news)
-    html_body = build_html(date, sections, news)
+    html_body = build_html(date, sections, news, has_photo=photo is not None)
 
     if os.environ.get("DRY_RUN") == "1":
         out = os.environ.get("DRY_RUN_FORMAT", "text")
         print(html_body if out == "html" else text_body)
         return
-    send_email(text_body, html_body, date)
+    send_email(text_body, html_body, date, photo)
 
 
 if __name__ == "__main__":
