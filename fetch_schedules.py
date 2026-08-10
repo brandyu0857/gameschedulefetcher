@@ -246,15 +246,22 @@ def news_text(items: List[NewsItem]) -> str:
     return "Shohei News\n" + "\n".join(lines)
 
 
+def _commons_photo(filename: str, width: int = 240) -> str:
+    """Wikimedia Commons' officially documented stable hotlink redirect —
+    resolves to the current upload.wikimedia.org thumb URL server-side,
+    so we never have to hand-guess the internal MD5 hash path itself."""
+    return f"https://commons.wikimedia.org/wiki/Special:FilePath/{urllib.parse.quote(filename)}?width={width}"
+
+
+# All sourced from Wikimedia Commons' Category:Shohei_Ohtani — Commons only
+# hosts public-domain or Creative-Commons-licensed media by its own policy.
 SHOHEI_PHOTOS = [
-    # MLB official headshot — always serves his current photo
-    "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/660271/headshot/67/current",
-    # MLB bust shot — same reliable Cloudinary pattern, different crop
-    "https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:83:current.png/w_213,q_auto:best/v1/people/660271/headshot/83/current",
-    # Wikimedia Commons — 2023 WBC (CC-BY-SA)
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Shohei_Ohtani_2023_WBC.jpg/240px-Shohei_Ohtani_2023_WBC.jpg",
-    # Wikimedia Commons — Dodgers 2024 (CC-BY-SA)
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Shohei_Ohtani_-_Los_Angeles_Dodgers_%282024%29.jpg/240px-Shohei_Ohtani_-_Los_Angeles_Dodgers_%282024%29.jpg",
+    _commons_photo("Shohei_Ohtani_in_2015.jpg"),  # CC0 / public domain
+    _commons_photo("Fighters_ohtani_11.jpg"),  # CC-BY-SA-3.0
+    _commons_photo("Shohei_Ohtani_2023_WBC.jpg"),  # CC-BY-SA
+    _commons_photo("Shohei_Ohtani_-_Los_Angeles_Dodgers_(2024).jpg"),  # CC-BY-SA
+    _commons_photo("Dodgers_at_Nationals_(53677192000)_(cropped).jpg"),  # Flickr-import, CC-BY/CC-BY-SA
+    _commons_photo("Shohei_Ohtani_on_April_23,_2024_(2)_53677091634.jpg"),  # Flickr-import, CC-BY/CC-BY-SA
 ]
 
 
