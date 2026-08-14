@@ -322,6 +322,7 @@ def build_text(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, n
     parts = [f"Today's Games — {date}", text_section("MLB", mlb), news_text(news)]
     if nba is not None:
         parts.append(text_section("NBA", nba))
+    parts.append("Sent daily at 10:00 AM Toronto time.\nCurated for you. Love you! ❤️")
     return "\n\n".join(parts)
 
 
@@ -382,7 +383,9 @@ def build_html(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, n
         f"{body}"
         '<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;'
         'color:#999;font:13px/1.4 -apple-system,sans-serif;">'
-        "Sent daily at 12:00 PM Toronto time.</p>"
+        "Sent daily at 10:00 AM Toronto time.</p>"
+        '<p style="margin:6px 0 0;color:#999;font:13px/1.4 -apple-system,sans-serif;">'
+        "Curated for you. Love you! ❤️</p>"
         "</td></tr></table></td></tr></table></body></html>"
     )
 
