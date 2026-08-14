@@ -197,28 +197,23 @@ def format_time(iso: str | None) -> str:
     return dt.strftime("%-I:%M %p ET")
 
 
-def safe_fetch(fn: Callable[[str], List[Game]], date: str, title: str = "") -> List[Game] | str:
+def safe_fetch(fn: Callable[[str], List[Game]], date: str) -> List[Game] | str:
     try:
         return fn(date)
     except Exception as e:
-        month = int(date[5:7])
-        if title == "NBA" and month in (7, 8, 9):
-            return []
         return f"(error fetching: {e})"
 
 
-def no_game_msg(title: str, date: str) -> str:
+def is_nba_offseason(date: str) -> bool:
     month = int(date[5:7])
-    if title == "NBA" and month in (7, 8, 9):
-        return "NBA season has ended. See you next season! 🏀"
-    return NO_GAME
+    return month in (7, 8, 9)
 
 
-def text_section(title: str, games: List[Game] | str, date: str = "") -> str:
+def text_section(title: str, games: List[Game] | str) -> str:
     if isinstance(games, str):
         return f"{title}\n  {games}"
     if not games:
-        return f"{title}\n  {no_game_msg(title, date)}"
+        return f"{title}\n  {NO_GAME}"
     lines = []
     for g in games:
         base = f"  • {g['away']} {g['separator']} {g['home']} — {g['time']}"
@@ -323,14 +318,14 @@ def news_html(items: List[NewsItem], has_photo: bool = True) -> str:
     return header + table
 
 
-def build_text(date: str, sections: list[tuple[str, List[Game] | str]], news: List[NewsItem]) -> str:
-    parts = [f"Today's Games — {date}"]
-    parts.extend(text_section(t, g, date) for t, g in sections)
-    parts.append(news_text(news))
+def build_text(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, news: List[NewsItem]) -> str:
+    parts = [f"Today's Games — {date}", text_section("MLB", mlb), news_text(news)]
+    if nba is not None:
+        parts.append(text_section("NBA", nba))
     return "\n\n".join(parts)
 
 
-def html_section(title: str, games: List[Game] | str, date: str = "") -> str:
+def html_section(title: str, games: List[Game] | str) -> str:
     color = SPORT_COLORS.get(title, "#333")
     header = (
         f'<h2 style="margin:28px 0 14px;padding:10px 14px;font:700 22px/1.3 -apple-system,'
@@ -340,8 +335,7 @@ def html_section(title: str, games: List[Game] | str, date: str = "") -> str:
     if isinstance(games, str):
         return header + f'<p style="margin:0;padding:12px 14px;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(games)}</p>'
     if not games:
-        msg = no_game_msg(title, date)
-        return header + f'<p style="margin:0;padding:12px 14px;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">{html.escape(msg)}</p>'
+        return header + f'<p style="margin:0;padding:12px 14px;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">{html.escape(NO_GAME)}</p>'
     rows = []
     for g in games:
         bg = "#ffffff"
@@ -370,8 +364,10 @@ def html_section(title: str, games: List[Game] | str, date: str = "") -> str:
     return header + table
 
 
-def build_html(date: str, sections: list[tuple[str, List[Game] | str]], news: List[NewsItem], has_photo: bool = True) -> str:
-    body = "".join(html_section(t, g, date) for t, g in sections)
+def build_html(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, news: List[NewsItem], has_photo: bool = True) -> str:
+    body = html_section("MLB", mlb) + news_html(news, has_photo)
+    if nba is not None:
+        body += html_section("NBA", nba)
     return (
         '<!doctype html><html><body style="margin:0;padding:0;background:#f5f5f7;">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f7;">'
@@ -384,7 +380,6 @@ def build_html(date: str, sections: list[tuple[str, List[Game] | str]], news: Li
         "Today's Games</h1>"
         f'<p style="margin:0;color:#666;font:16px/1.4 -apple-system,sans-serif;">{html.escape(date)}</p>'
         f"{body}"
-        f"{news_html(news, has_photo)}"
         '<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #eee;'
         'color:#999;font:13px/1.4 -apple-system,sans-serif;">'
         "Sent daily at 12:00 PM Toronto time.</p>"
@@ -422,14 +417,12 @@ def main() -> None:
     tz = ZoneInfo("America/Toronto")
     now = datetime.now(tz)
     date = now.strftime("%Y-%m-%d")
-    sections = [
-        ("MLB", safe_fetch(fetch_mlb, date)),
-        ("NBA", safe_fetch(fetch_nba, date, "NBA")),
-    ]
+    mlb_games = safe_fetch(fetch_mlb, date)
+    nba_games = None if is_nba_offseason(date) else safe_fetch(fetch_nba, date)
     news = fetch_news()
     photo = fetch_shohei_photo(date)
-    text_body = build_text(date, sections, news)
-    html_body = build_html(date, sections, news, has_photo=photo is not None)
+    text_body = build_text(date, mlb_games, nba_games, news)
+    html_body = build_html(date, mlb_games, nba_games, news, has_photo=photo is not None)
 
     if os.environ.get("DRY_RUN") == "1":
         out = os.environ.get("DRY_RUN_FORMAT", "text")
