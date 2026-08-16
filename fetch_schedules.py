@@ -154,10 +154,11 @@ class NewsItem(TypedDict):
     published: str
 
 
-def fetch_news() -> List[NewsItem]:
+def fetch_news() -> List[NewsItem] | str:
     seen_urls: set[str] = set()
     seen_titles: set[str] = set()
     items: List[tuple[datetime, NewsItem]] = []
+    last_error: Exception | None = None
     for topic in NEWS_TOPICS:
         q = urllib.parse.quote(topic)
         url = f"https://news.google.com/rss/search?q={q}&hl=en-CA&gl=CA&ceid=CA:en"
@@ -184,8 +185,11 @@ def fetch_news() -> List[NewsItem]:
                 except Exception:
                     dt = datetime.min.replace(tzinfo=ZoneInfo("UTC"))
                 items.append((dt, {"title": clean_title, "url": link, "source": source, "published": pub}))
-        except Exception:
+        except Exception as e:
+            last_error = e
             continue
+    if not items and last_error is not None:
+        return f"(error fetching: {last_error})"
     items.sort(key=lambda x: x[0], reverse=True)
     return [item for _, item in items[:NEWS_COUNT]]
 
@@ -223,7 +227,9 @@ def text_section(title: str, games: List[Game] | str) -> str:
     return f"{title}\n" + "\n".join(lines)
 
 
-def news_text(items: List[NewsItem]) -> str:
+def news_text(items: List[NewsItem] | str) -> str:
+    if isinstance(items, str):
+        return f"Shohei News\n  {items}"
     if not items:
         return "Shohei News\n  No news found today."
     lines = [f"  • {n['title']} ({n['source']})\n    {n['url']}" for n in items]
@@ -274,7 +280,7 @@ def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
     return None
 
 
-def news_html(items: List[NewsItem], has_photo: bool = True) -> str:
+def news_html(items: List[NewsItem] | str, has_photo: bool = True) -> str:
     if has_photo:
         polaroid = (
             '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
@@ -299,6 +305,8 @@ def news_html(items: List[NewsItem], has_photo: bool = True) -> str:
         '</tr>'
         '</table>'
     )
+    if isinstance(items, str):
+        return header + f'<p style="margin:0;padding:12px 14px;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(items)}</p>'
     if not items:
         return header + '<p style="margin:0;padding:12px 14px;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">No news found today.</p>'
     rows = []
@@ -318,7 +326,7 @@ def news_html(items: List[NewsItem], has_photo: bool = True) -> str:
     return header + table
 
 
-def build_text(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, news: List[NewsItem]) -> str:
+def build_text(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, news: List[NewsItem] | str) -> str:
     parts = [f"Today's Games — {date}", text_section("MLB", mlb), news_text(news)]
     if nba is not None:
         parts.append(text_section("NBA", nba))
@@ -365,7 +373,7 @@ def html_section(title: str, games: List[Game] | str) -> str:
     return header + table
 
 
-def build_html(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, news: List[NewsItem], has_photo: bool = True) -> str:
+def build_html(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, news: List[NewsItem] | str, has_photo: bool = True) -> str:
     body = html_section("MLB", mlb) + news_html(news, has_photo)
     if nba is not None:
         body += html_section("NBA", nba)
