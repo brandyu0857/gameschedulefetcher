@@ -252,6 +252,12 @@ SHOHEI_PHOTOS = [
     _commons_photo("Shohei_Ohtani_-_Los_Angeles_Dodgers_(2024).jpg"),  # CC-BY-SA
     _commons_photo("Dodgers_at_Nationals_(53677192000)_(cropped).jpg"),  # Flickr-import, CC-BY/CC-BY-SA
     _commons_photo("Shohei_Ohtani_on_April_23,_2024_(2)_53677091634.jpg"),  # Flickr-import, CC-BY/CC-BY-SA
+    _commons_photo("Shohei_Ohtani_(16735312258)_(cropped).jpg"),  # 2015, Tomodachi Charity Camp, Flickr-import
+    _commons_photo("Shohei_Ohtani_2019.jpg"),  # 2019, NPB era
+    _commons_photo("Shohei_Ohtani_20230303_01.jpg"),  # 2023, WBC prep era
+    _commons_photo("Shohei_Ohtani_(52252068139)_(cropped).jpg"),  # 2024 Dodgers, Flickr-import
+    _commons_photo("Shohei_Ohtani_(52251723213)_(cropped_2).jpg"),  # 2024 Dodgers, Flickr-import
+    _commons_photo("Shohei_Ohtani_(52252188505).jpg"),  # 2024 Dodgers, Flickr-import
 ]
 
 
