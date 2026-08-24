@@ -144,7 +144,7 @@ def fetch_world_cup(date: str) -> List[Game]:
 
 
 NEWS_TOPICS = ["Shohei Ohtani"]
-NEWS_COUNT = 3
+NEWS_COUNT = 2
 
 
 class NewsItem(TypedDict):
@@ -261,18 +261,30 @@ SHOHEI_PHOTOS = [
 ]
 
 
-def pick_shohei_photo(date: str) -> str:
-    return random.Random(date).choice(SHOHEI_PHOTOS)
+def pick_shohei_photo(seed: str) -> str:
+    return random.Random(seed).choice(SHOHEI_PHOTOS)
 
 
 SHOHEI_PHOTO_CID = "shohei_photo"
+SHOHEI_MEME_CID = "shohei_meme"
+
+MEME_CAPTIONS = [
+    ("THEY SAID PICK ONE", "SHOHEI SAID WHY NOT BOTH"),
+    ("50 HOME RUNS. 50 STOLEN BASES.", "JUST ANOTHER TUESDAY"),
+    ("EVERYONE ELSE: SPECIALIZE", "SHOHEI: NAH"),
+    ("PITCHER BY DAY", "SLUGGER BY NIGHT"),
+]
 
 
-def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
-    """Fetch the day's Shohei photo bytes server-side, trying every pool
-    photo (starting from the day's pick) until one succeeds, so a broken
-    or hotlink-blocked source doesn't break the embedded image."""
-    first = pick_shohei_photo(date)
+def pick_meme_caption(date: str) -> tuple[str, str]:
+    return random.Random(date + "-caption").choice(MEME_CAPTIONS)
+
+
+def _fetch_photo_bytes(seed: str) -> tuple[bytes, str] | None:
+    """Fetch a Shohei photo's bytes server-side, trying every pool photo
+    (starting from the seed's pick) until one succeeds, so a broken or
+    hotlink-blocked source doesn't break the embedded image."""
+    first = pick_shohei_photo(seed)
     ordered = [first] + [u for u in SHOHEI_PHOTOS if u != first]
     for url in ordered:
         try:
@@ -286,7 +298,35 @@ def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
     return None
 
 
-def news_html(items: List[NewsItem] | str, has_photo: bool = True) -> str:
+def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
+    return _fetch_photo_bytes(date)
+
+
+def fetch_shohei_meme(date: str) -> tuple[bytes, str] | None:
+    return _fetch_photo_bytes(date + "-meme")
+
+
+def meme_html(caption: tuple[str, str] | None) -> str:
+    if caption is None:
+        return ""
+    top, bottom = caption
+    caption_style = (
+        "position:absolute;left:0;right:0;margin:0;padding:0 10px;text-align:center;"
+        "font:900 22px/1.15 Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif;"
+        "color:#fff;text-transform:uppercase;letter-spacing:0.5px;"
+        "text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 0 6px #000;"
+    )
+    return (
+        '<div style="position:relative;max-width:320px;margin:16px auto 0;line-height:0;">'
+        f'<img src="cid:{SHOHEI_MEME_CID}" width="320" '
+        'style="display:block;width:100%;height:auto;border-radius:6px;" alt="Shohei meme"/>'
+        f'<p style="{caption_style}top:8px;">{html.escape(top)}</p>'
+        f'<p style="{caption_style}bottom:8px;">{html.escape(bottom)}</p>'
+        '</div>'
+    )
+
+
+def news_html(items: List[NewsItem] | str, has_photo: bool = True, meme_caption: tuple[str, str] | None = None) -> str:
     if has_photo:
         polaroid = (
             '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
@@ -311,10 +351,11 @@ def news_html(items: List[NewsItem] | str, has_photo: bool = True) -> str:
         '</tr>'
         '</table>'
     )
+    meme = meme_html(meme_caption)
     if isinstance(items, str):
-        return header + f'<p style="margin:0;padding:12px 14px;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(items)}</p>'
+        return header + f'<p style="margin:0;padding:12px 14px;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(items)}</p>' + meme
     if not items:
-        return header + '<p style="margin:0;padding:12px 14px;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">No news found today.</p>'
+        return header + '<p style="margin:0;padding:12px 14px;color:#666;font:italic 16px/1.5 -apple-system,sans-serif;">No news found today.</p>' + meme
     rows = []
     for n in items:
         rows.append(
@@ -329,7 +370,7 @@ def news_html(items: List[NewsItem] | str, has_photo: bool = True) -> str:
         'style="border-collapse:collapse;border:1px solid #eee;border-radius:6px;overflow:hidden;">'
         + "".join(rows) + "</table>"
     )
-    return header + table
+    return header + table + meme
 
 
 def build_text(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, news: List[NewsItem] | str) -> str:
@@ -379,8 +420,15 @@ def html_section(title: str, games: List[Game] | str) -> str:
     return header + table
 
 
-def build_html(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, news: List[NewsItem] | str, has_photo: bool = True) -> str:
-    body = html_section("MLB", mlb) + news_html(news, has_photo)
+def build_html(
+    date: str,
+    mlb: List[Game] | str,
+    nba: List[Game] | str | None,
+    news: List[NewsItem] | str,
+    has_photo: bool = True,
+    meme_caption: tuple[str, str] | None = None,
+) -> str:
+    body = html_section("MLB", mlb) + news_html(news, has_photo, meme_caption)
     if nba is not None:
         body += html_section("NBA", nba)
     return (
@@ -404,7 +452,13 @@ def build_html(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, n
     )
 
 
-def send_email(text_body: str, html_body: str, date: str, photo: tuple[bytes, str] | None) -> None:
+def send_email(
+    text_body: str,
+    html_body: str,
+    date: str,
+    photo: tuple[bytes, str] | None,
+    meme: tuple[bytes, str] | None,
+) -> None:
     host = os.environ["SMTP_HOST"]
     port = int(os.environ.get("SMTP_PORT", "587"))
     user = os.environ["SMTP_USER"]
@@ -419,10 +473,13 @@ def send_email(text_body: str, html_body: str, date: str, photo: tuple[bytes, st
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
 
+    html_part = msg.get_payload()[1]
     if photo:
         photo_bytes, subtype = photo
-        html_part = msg.get_payload()[1]
         html_part.add_related(photo_bytes, maintype="image", subtype=subtype, cid=f"<{SHOHEI_PHOTO_CID}>")
+    if meme:
+        meme_bytes, subtype = meme
+        html_part.add_related(meme_bytes, maintype="image", subtype=subtype, cid=f"<{SHOHEI_MEME_CID}>")
 
     with smtplib.SMTP(host, port) as s:
         s.starttls(context=ssl.create_default_context())
@@ -438,14 +495,16 @@ def main() -> None:
     nba_games = None if is_nba_offseason(date) else safe_fetch(fetch_nba, date)
     news = fetch_news()
     photo = fetch_shohei_photo(date)
+    meme = fetch_shohei_meme(date)
+    meme_caption = pick_meme_caption(date) if meme else None
     text_body = build_text(date, mlb_games, nba_games, news)
-    html_body = build_html(date, mlb_games, nba_games, news, has_photo=photo is not None)
+    html_body = build_html(date, mlb_games, nba_games, news, has_photo=photo is not None, meme_caption=meme_caption)
 
     if os.environ.get("DRY_RUN") == "1":
         out = os.environ.get("DRY_RUN_FORMAT", "text")
         print(html_body if out == "html" else text_body)
         return
-    send_email(text_body, html_body, date, photo)
+    send_email(text_body, html_body, date, photo, meme)
 
 
 if __name__ == "__main__":
