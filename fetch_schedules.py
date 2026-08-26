@@ -261,32 +261,26 @@ SHOHEI_PHOTOS = [
 ]
 
 
-def pick_shohei_photo(seed: str) -> str:
-    return random.Random(seed).choice(SHOHEI_PHOTOS)
-
-
 SHOHEI_PHOTO_CID = "shohei_photo"
 SHOHEI_MEME_CID = "shohei_meme"
 
-MEME_CAPTIONS = [
-    ("THEY SAID PICK ONE", "SHOHEI SAID WHY NOT BOTH"),
-    ("50 HOME RUNS. 50 STOLEN BASES.", "JUST ANOTHER TUESDAY"),
-    ("EVERYONE ELSE: SPECIALIZE", "SHOHEI: NAH"),
-    ("PITCHER BY DAY", "SLUGGER BY NIGHT"),
+# MLB's own official Giphy channel + other verified MLB/team-account GIFs —
+# real, ready-made, and explicitly published for embedding elsewhere.
+SHOHEI_MEMES = [
+    "https://media.giphy.com/media/3oxHQwk90rZEjMXQRi/giphy.gif",  # MLB
+    "https://media.giphy.com/media/iuS9BY0fZyteby5GHm/giphy.gif",  # MLB — "Happy Shohei Ohtani"
+    "https://media.giphy.com/media/gh5Wg4ooDTZRRcLP3g/giphy.gif",  # MLB — "Celebrate Shohei Ohtani"
+    "https://media.giphy.com/media/fHEkXGAZaCefxYwhc5/giphy.gif",  # YES Network
 ]
 
 
-def pick_meme_caption(date: str) -> tuple[str, str]:
-    return random.Random(date + "-caption").choice(MEME_CAPTIONS)
-
-
-def _fetch_photo_bytes(seed: str) -> tuple[bytes, str] | None:
-    """Fetch a Shohei photo's bytes server-side, trying every pool photo
-    (starting from the seed's pick) until one succeeds, so a broken or
-    hotlink-blocked source doesn't break the embedded image."""
-    first = pick_shohei_photo(seed)
-    ordered = [first] + [u for u in SHOHEI_PHOTOS if u != first]
-    for url in ordered:
+def _fetch_from_pool(seed: str, pool: List[str]) -> tuple[bytes, str] | None:
+    """Fetch bytes for one URL from a pool, server-side. Tries every URL
+    in a seed-shuffled order (not the pool's fixed order) so a handful of
+    broken/hotlink-blocked sources can't make every seed silently converge
+    on the same single working fallback."""
+    order = random.Random(seed).sample(pool, len(pool))
+    for url in order:
         try:
             r = requests.get(url, timeout=TIMEOUT, headers=HEADERS)
             r.raise_for_status()
@@ -299,34 +293,25 @@ def _fetch_photo_bytes(seed: str) -> tuple[bytes, str] | None:
 
 
 def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
-    return _fetch_photo_bytes(date)
+    return _fetch_from_pool(date, SHOHEI_PHOTOS)
 
 
 def fetch_shohei_meme(date: str) -> tuple[bytes, str] | None:
-    return _fetch_photo_bytes(date + "-meme")
+    return _fetch_from_pool(date + "-meme", SHOHEI_MEMES)
 
 
-def meme_html(caption: tuple[str, str] | None) -> str:
-    if caption is None:
+def meme_html(has_meme: bool) -> str:
+    if not has_meme:
         return ""
-    top, bottom = caption
-    caption_style = (
-        "position:absolute;left:0;right:0;margin:0;padding:0 10px;text-align:center;"
-        "font:900 22px/1.15 Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif;"
-        "color:#fff;text-transform:uppercase;letter-spacing:0.5px;"
-        "text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 0 6px #000;"
-    )
     return (
-        '<div style="position:relative;max-width:320px;margin:16px auto 0;line-height:0;">'
+        '<div style="max-width:320px;margin:16px auto 0;line-height:0;">'
         f'<img src="cid:{SHOHEI_MEME_CID}" width="320" '
         'style="display:block;width:100%;height:auto;border-radius:6px;" alt="Shohei meme"/>'
-        f'<p style="{caption_style}top:8px;">{html.escape(top)}</p>'
-        f'<p style="{caption_style}bottom:8px;">{html.escape(bottom)}</p>'
         '</div>'
     )
 
 
-def news_html(items: List[NewsItem] | str, has_photo: bool = True, meme_caption: tuple[str, str] | None = None) -> str:
+def news_html(items: List[NewsItem] | str, has_photo: bool = True, has_meme: bool = True) -> str:
     if has_photo:
         polaroid = (
             '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
@@ -351,7 +336,7 @@ def news_html(items: List[NewsItem] | str, has_photo: bool = True, meme_caption:
         '</tr>'
         '</table>'
     )
-    meme = meme_html(meme_caption)
+    meme = meme_html(has_meme)
     if isinstance(items, str):
         return header + f'<p style="margin:0;padding:12px 14px;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(items)}</p>' + meme
     if not items:
@@ -426,9 +411,9 @@ def build_html(
     nba: List[Game] | str | None,
     news: List[NewsItem] | str,
     has_photo: bool = True,
-    meme_caption: tuple[str, str] | None = None,
+    has_meme: bool = True,
 ) -> str:
-    body = html_section("MLB", mlb) + news_html(news, has_photo, meme_caption)
+    body = html_section("MLB", mlb) + news_html(news, has_photo, has_meme)
     if nba is not None:
         body += html_section("NBA", nba)
     return (
@@ -496,9 +481,8 @@ def main() -> None:
     news = fetch_news()
     photo = fetch_shohei_photo(date)
     meme = fetch_shohei_meme(date)
-    meme_caption = pick_meme_caption(date) if meme else None
     text_body = build_text(date, mlb_games, nba_games, news)
-    html_body = build_html(date, mlb_games, nba_games, news, has_photo=photo is not None, meme_caption=meme_caption)
+    html_body = build_html(date, mlb_games, nba_games, news, has_photo=photo is not None, has_meme=meme is not None)
 
     if os.environ.get("DRY_RUN") == "1":
         out = os.environ.get("DRY_RUN_FORMAT", "text")
