@@ -266,12 +266,9 @@ SHOHEI_MEME_CID = "shohei_meme"
 
 # MLB's own official Giphy channel + other verified MLB/team-account GIFs —
 # real, ready-made, and explicitly published for embedding elsewhere.
-SHOHEI_MEMES = [
-    "https://media.giphy.com/media/3oxHQwk90rZEjMXQRi/giphy.gif",  # MLB
-    "https://media.giphy.com/media/iuS9BY0fZyteby5GHm/giphy.gif",  # MLB — "Happy Shohei Ohtani"
-    "https://media.giphy.com/media/gh5Wg4ooDTZRRcLP3g/giphy.gif",  # MLB — "Celebrate Shohei Ohtani"
-    "https://media.giphy.com/media/fHEkXGAZaCefxYwhc5/giphy.gif",  # YES Network
-]
+# Giphy's public beta key — fine for this volume (one request/day). Set
+# GIPHY_API_KEY to use a real key instead (higher rate limit).
+GIPHY_API_KEY = os.environ.get("GIPHY_API_KEY", "dc6zaTOxFJmzC")
 
 
 def _fetch_from_pool(seed: str, pool: List[str]) -> tuple[bytes, str] | None:
@@ -297,7 +294,33 @@ def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
 
 
 def fetch_shohei_meme(date: str) -> tuple[bytes, str] | None:
-    return _fetch_from_pool(date + "-meme", SHOHEI_MEMES)
+    """Pull a fresh Shohei Ohtani GIF from Giphy's search API each day —
+    no hardcoded URL list to maintain, and it genuinely rotates since we
+    pick from Giphy's live results rather than a fixed pool."""
+    try:
+        r = requests.get(
+            "https://api.giphy.com/v1/gifs/search",
+            params={"api_key": GIPHY_API_KEY, "q": "Shohei Ohtani", "limit": 25, "rating": "pg"},
+            timeout=TIMEOUT,
+        )
+        r.raise_for_status()
+        results = r.json().get("data", [])
+    except Exception:
+        return None
+    if not results:
+        return None
+    order = random.Random(date + "-meme").sample(results, len(results))
+    for gif in order:
+        try:
+            gif_url = gif["images"]["fixed_width"]["url"]
+            img_r = requests.get(gif_url, timeout=TIMEOUT, headers=HEADERS)
+            img_r.raise_for_status()
+            content_type = img_r.headers.get("Content-Type", "image/gif").split(";")[0].strip()
+            subtype = content_type.split("/", 1)[1] if "/" in content_type else "gif"
+            return img_r.content, subtype
+        except Exception:
+            continue
+    return None
 
 
 def meme_html(has_meme: bool) -> str:
