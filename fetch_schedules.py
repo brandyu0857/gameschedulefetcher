@@ -264,11 +264,20 @@ SHOHEI_PHOTOS = [
 SHOHEI_PHOTO_CID = "shohei_photo"
 SHOHEI_MEME_CID = "shohei_meme"
 
-# MLB's own official Giphy channel + other verified MLB/team-account GIFs —
-# real, ready-made, and explicitly published for embedding elsewhere.
 # Giphy's public beta key — fine for this volume (one request/day). Set
 # GIPHY_API_KEY to use a real key instead (higher rate limit).
 GIPHY_API_KEY = os.environ.get("GIPHY_API_KEY", "dc6zaTOxFJmzC")
+
+# Shown instead of the GIF on days the Giphy fetch fails entirely, so the
+# section footer is never silently blank — and it's a visible signal that
+# today's GIF fetch failed, rather than indistinguishable from "everything
+# is fine, there's just nothing here."
+FALLBACK_MEME_LINES = [
+    "TWO-WAY PLAYER SZN NEVER ENDS 😤",
+    "50/50 CLUB. NO BIG DEAL. 🔥",
+    "PITCHER BY DAY, SLUGGER BY NIGHT ⚾",
+    "SHOHEI DOESN'T MISS. EVER. 🌟",
+]
 
 
 def _fetch_from_pool(seed: str, pool: List[str]) -> tuple[bytes, str] | None:
@@ -293,6 +302,9 @@ def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
     return _fetch_from_pool(date, SHOHEI_PHOTOS)
 
 
+MEME_RENDITIONS = ["fixed_width", "downsized", "fixed_height", "original"]
+
+
 def fetch_shohei_meme(date: str) -> tuple[bytes, str] | None:
     """Pull a fresh Shohei Ohtani GIF from Giphy's search API each day —
     no hardcoded URL list to maintain, and it genuinely rotates since we
@@ -311,30 +323,44 @@ def fetch_shohei_meme(date: str) -> tuple[bytes, str] | None:
         return None
     order = random.Random(date + "-meme").sample(results, len(results))
     for gif in order:
-        try:
-            gif_url = gif["images"]["fixed_width"]["url"]
-            img_r = requests.get(gif_url, timeout=TIMEOUT, headers=HEADERS)
-            img_r.raise_for_status()
-            content_type = img_r.headers.get("Content-Type", "image/gif").split(";")[0].strip()
-            subtype = content_type.split("/", 1)[1] if "/" in content_type else "gif"
-            return img_r.content, subtype
-        except Exception:
-            continue
+        images = gif.get("images", {})
+        for rendition in MEME_RENDITIONS:
+            gif_url = images.get(rendition, {}).get("url")
+            if not gif_url:
+                continue
+            try:
+                img_r = requests.get(gif_url, timeout=8, headers=HEADERS)
+                img_r.raise_for_status()
+                content_type = img_r.headers.get("Content-Type", "image/gif").split(";")[0].strip()
+                subtype = content_type.split("/", 1)[1] if "/" in content_type else "gif"
+                return img_r.content, subtype
+            except Exception:
+                continue
     return None
 
 
-def meme_html(has_meme: bool) -> str:
-    if not has_meme:
-        return ""
+def pick_fallback_meme_line(date: str) -> str:
+    return random.Random(date + "-fallback-meme").choice(FALLBACK_MEME_LINES)
+
+
+def meme_html(has_meme: bool, fallback_line: str) -> str:
+    if has_meme:
+        return (
+            '<div style="max-width:320px;margin:16px auto 0;line-height:0;">'
+            f'<img src="cid:{SHOHEI_MEME_CID}" width="320" '
+            'style="display:block;width:100%;height:auto;border-radius:6px;" alt="Shohei meme"/>'
+            '</div>'
+        )
     return (
-        '<div style="max-width:320px;margin:16px auto 0;line-height:0;">'
-        f'<img src="cid:{SHOHEI_MEME_CID}" width="320" '
-        'style="display:block;width:100%;height:auto;border-radius:6px;" alt="Shohei meme"/>'
+        '<div style="max-width:320px;margin:16px auto 0;padding:14px;background:#1a3a5c;'
+        'border-radius:8px;text-align:center;">'
+        f'<p style="margin:0;color:#fff;font:700 16px/1.3 -apple-system,Segoe UI,Roboto,sans-serif;">'
+        f'{html.escape(fallback_line)}</p>'
         '</div>'
     )
 
 
-def news_html(items: List[NewsItem] | str, has_photo: bool = True, has_meme: bool = True) -> str:
+def news_html(items: List[NewsItem] | str, has_photo: bool = True, has_meme: bool = True, fallback_meme_line: str = "") -> str:
     if has_photo:
         polaroid = (
             '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
@@ -359,7 +385,7 @@ def news_html(items: List[NewsItem] | str, has_photo: bool = True, has_meme: boo
         '</tr>'
         '</table>'
     )
-    meme = meme_html(has_meme)
+    meme = meme_html(has_meme, fallback_meme_line)
     if isinstance(items, str):
         return header + f'<p style="margin:0;padding:12px 14px;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(items)}</p>' + meme
     if not items:
@@ -435,8 +461,9 @@ def build_html(
     news: List[NewsItem] | str,
     has_photo: bool = True,
     has_meme: bool = True,
+    fallback_meme_line: str = "",
 ) -> str:
-    body = html_section("MLB", mlb) + news_html(news, has_photo, has_meme)
+    body = html_section("MLB", mlb) + news_html(news, has_photo, has_meme, fallback_meme_line)
     if nba is not None:
         body += html_section("NBA", nba)
     return (
@@ -505,7 +532,12 @@ def main() -> None:
     photo = fetch_shohei_photo(date)
     meme = fetch_shohei_meme(date)
     text_body = build_text(date, mlb_games, nba_games, news)
-    html_body = build_html(date, mlb_games, nba_games, news, has_photo=photo is not None, has_meme=meme is not None)
+    html_body = build_html(
+        date, mlb_games, nba_games, news,
+        has_photo=photo is not None,
+        has_meme=meme is not None,
+        fallback_meme_line=pick_fallback_meme_line(date),
+    )
 
     if os.environ.get("DRY_RUN") == "1":
         out = os.environ.get("DRY_RUN_FORMAT", "text")
