@@ -304,11 +304,24 @@ def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
 
 MEME_RENDITIONS = ["fixed_width", "downsized", "fixed_height", "original"]
 
+# Used only when Giphy is unreachable and we fall back to one of our own
+# Wikimedia photos with a caption overlay (see fetch_shohei_meme).
+MEME_CAPTIONS = [
+    ("THEY SAID PICK ONE", "SHOHEI SAID WHY NOT BOTH"),
+    ("50 HOME RUNS. 50 STOLEN BASES.", "JUST ANOTHER TUESDAY"),
+    ("EVERYONE ELSE: SPECIALIZE", "SHOHEI: NAH"),
+    ("PITCHER BY DAY", "SLUGGER BY NIGHT"),
+]
 
-def fetch_shohei_meme(date: str) -> tuple[bytes, str] | None:
-    """Pull a fresh Shohei Ohtani GIF from Giphy's search API each day —
-    no hardcoded URL list to maintain, and it genuinely rotates since we
-    pick from Giphy's live results rather than a fixed pool."""
+
+def pick_meme_caption(date: str) -> tuple[str, str]:
+    return random.Random(date + "-caption").choice(MEME_CAPTIONS)
+
+
+def _fetch_giphy_meme(date: str) -> tuple[bytes, str] | None:
+    """Pull a fresh Shohei Ohtani GIF from Giphy's search API — no
+    hardcoded URL list to maintain, and it genuinely rotates since we pick
+    from Giphy's live results rather than a fixed pool."""
     try:
         r = requests.get(
             "https://api.giphy.com/v1/gifs/search",
@@ -339,28 +352,64 @@ def fetch_shohei_meme(date: str) -> tuple[bytes, str] | None:
     return None
 
 
+def fetch_shohei_meme(date: str) -> tuple[tuple[bytes, str], tuple[str, str] | None] | None:
+    """Try a real Shohei GIF from Giphy first. If Giphy is unreachable
+    (confirmed to happen from this project's GitHub Actions runners),
+    fall back to one of our own already-reliable Wikimedia photos with a
+    CSS caption overlay, so the meme still shows something fun instead of
+    a text-only placeholder. Returns (image, caption) where caption is
+    None for a real Giphy GIF, or the (top, bottom) overlay text for the
+    photo fallback."""
+    gif = _fetch_giphy_meme(date)
+    if gif:
+        return gif, None
+    photo = _fetch_from_pool(date + "-meme-fallback", SHOHEI_PHOTOS)
+    if photo:
+        return photo, pick_meme_caption(date)
+    return None
+
+
 def pick_fallback_meme_line(date: str) -> str:
     return random.Random(date + "-fallback-meme").choice(FALLBACK_MEME_LINES)
 
 
-def meme_html(has_meme: bool, fallback_line: str) -> str:
-    if has_meme:
+def meme_html(has_meme: bool, caption: tuple[str, str] | None, fallback_line: str) -> str:
+    if not has_meme:
         return (
-            '<div style="max-width:320px;margin:16px auto 0;line-height:0;">'
-            f'<img src="cid:{SHOHEI_MEME_CID}" width="320" '
-            'style="display:block;width:100%;height:auto;border-radius:6px;" alt="Shohei meme"/>'
+            '<div style="max-width:320px;margin:16px auto 0;padding:14px;background:#1a3a5c;'
+            'border-radius:8px;text-align:center;">'
+            f'<p style="margin:0;color:#fff;font:700 16px/1.3 -apple-system,Segoe UI,Roboto,sans-serif;">'
+            f'{html.escape(fallback_line)}</p>'
             '</div>'
         )
+    img_tag = (
+        f'<img src="cid:{SHOHEI_MEME_CID}" width="320" '
+        'style="display:block;width:100%;height:auto;border-radius:6px;" alt="Shohei meme"/>'
+    )
+    if caption is None:
+        return f'<div style="max-width:320px;margin:16px auto 0;line-height:0;">{img_tag}</div>'
+    top, bottom = caption
+    caption_style = (
+        "position:absolute;left:0;right:0;margin:0;padding:0 10px;text-align:center;"
+        "font:900 22px/1.15 Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif;"
+        "color:#fff;text-transform:uppercase;letter-spacing:0.5px;"
+        "text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000,0 0 6px #000;"
+    )
     return (
-        '<div style="max-width:320px;margin:16px auto 0;padding:14px;background:#1a3a5c;'
-        'border-radius:8px;text-align:center;">'
-        f'<p style="margin:0;color:#fff;font:700 16px/1.3 -apple-system,Segoe UI,Roboto,sans-serif;">'
-        f'{html.escape(fallback_line)}</p>'
+        f'<div style="position:relative;max-width:320px;margin:16px auto 0;line-height:0;">{img_tag}'
+        f'<p style="{caption_style}top:8px;">{html.escape(top)}</p>'
+        f'<p style="{caption_style}bottom:8px;">{html.escape(bottom)}</p>'
         '</div>'
     )
 
 
-def news_html(items: List[NewsItem] | str, has_photo: bool = True, has_meme: bool = True, fallback_meme_line: str = "") -> str:
+def news_html(
+    items: List[NewsItem] | str,
+    has_photo: bool = True,
+    has_meme: bool = True,
+    meme_caption: tuple[str, str] | None = None,
+    fallback_meme_line: str = "",
+) -> str:
     if has_photo:
         polaroid = (
             '<div style="display:inline-block;background:#fff;padding:4px 4px 14px 4px;'
@@ -385,7 +434,7 @@ def news_html(items: List[NewsItem] | str, has_photo: bool = True, has_meme: boo
         '</tr>'
         '</table>'
     )
-    meme = meme_html(has_meme, fallback_meme_line)
+    meme = meme_html(has_meme, meme_caption, fallback_meme_line)
     if isinstance(items, str):
         return header + f'<p style="margin:0;padding:12px 14px;color:#b00;font:16px/1.5 -apple-system,sans-serif;">{html.escape(items)}</p>' + meme
     if not items:
@@ -461,9 +510,10 @@ def build_html(
     news: List[NewsItem] | str,
     has_photo: bool = True,
     has_meme: bool = True,
+    meme_caption: tuple[str, str] | None = None,
     fallback_meme_line: str = "",
 ) -> str:
-    body = html_section("MLB", mlb) + news_html(news, has_photo, has_meme, fallback_meme_line)
+    body = html_section("MLB", mlb) + news_html(news, has_photo, has_meme, meme_caption, fallback_meme_line)
     if nba is not None:
         body += html_section("NBA", nba)
     return (
@@ -530,12 +580,14 @@ def main() -> None:
     nba_games = None if is_nba_offseason(date) else safe_fetch(fetch_nba, date)
     news = fetch_news()
     photo = fetch_shohei_photo(date)
-    meme = fetch_shohei_meme(date)
+    meme_result = fetch_shohei_meme(date)
+    meme, meme_caption = meme_result if meme_result else (None, None)
     text_body = build_text(date, mlb_games, nba_games, news)
     html_body = build_html(
         date, mlb_games, nba_games, news,
         has_photo=photo is not None,
         has_meme=meme is not None,
+        meme_caption=meme_caption,
         fallback_meme_line=pick_fallback_meme_line(date),
     )
 
