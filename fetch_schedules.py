@@ -9,6 +9,7 @@ import smtplib
 import ssl
 import urllib.parse
 import xml.etree.ElementTree as ET
+from datetime import date as date_cls
 from datetime import datetime
 from email.message import EmailMessage
 from email.utils import parsedate_to_datetime
@@ -16,6 +17,7 @@ from typing import Callable, List, TypedDict
 from zoneinfo import ZoneInfo
 
 import requests
+from lunardate import LunarDate
 
 TIMEOUT = 15
 FEATURED_MLB_TEAMS = {"Toronto Blue Jays", "Los Angeles Dodgers"}
@@ -313,19 +315,47 @@ MEME_CAPTIONS = [
     ("PITCHER BY DAY", "SLUGGER BY NIGHT"),
 ]
 
+# Fixed-date special occasions: (month, day) -> (giphy search query, fallback line
+# shown if Giphy fails). Checked before Chinese New Year, so a rare collision
+# (e.g. CNY landing on Feb 14) resolves to the fixed-date entry.
+SPECIAL_DATES: dict[tuple[int, int], tuple[str, str]] = {
+    (1, 1): ("happy new year", "HAPPY NEW YEAR 🎉"),
+    (2, 14): ("happy valentines day", "HAPPY VALENTINE'S DAY 💘"),
+    (5, 5): ("happy birthday mom", "HAPPY BIRTHDAY, MOM! 🎂"),
+    (5, 20): ("happy birthday dad", "HAPPY BIRTHDAY, DAD! 🎂"),
+    (7, 10): ("happy birthday", "HAPPY BIRTHDAY! 🎂"),
+    (7, 22): ("happy anniversary", "HAPPY MARRIAGE ANNIVERSARY! 💍"),
+    (7, 25): ("happy birthday", "HAPPY BIRTHDAY! 🎂"),
+    (10, 3): ("happy birthday mom", "HAPPY BIRTHDAY, MOM! 🎂"),
+    (12, 25): ("merry christmas", "HAPPY XMAS! 🎄"),
+}
+
+
+def get_special_occasion(d: date_cls) -> tuple[str, str] | None:
+    """Return (giphy_query, fallback_line) if today is a special occasion,
+    else None. Chinese New Year is computed dynamically via the lunar
+    calendar (accurate through the year 2100) rather than a hardcoded
+    table, since its Gregorian date shifts every year."""
+    fixed = SPECIAL_DATES.get((d.month, d.day))
+    if fixed:
+        return fixed
+    if d == LunarDate(d.year, 1, 1).to_solar_date():
+        return "happy chinese new year", "HAPPY CHINESE NEW YEAR 🧧"
+    return None
+
 
 def pick_meme_caption(date: str) -> tuple[str, str]:
     return random.Random(date + "-caption").choice(MEME_CAPTIONS)
 
 
-def _fetch_giphy_meme(date: str) -> tuple[bytes, str] | None:
-    """Pull a fresh Shohei Ohtani GIF from Giphy's search API — no
+def _fetch_giphy_gif(date: str, query: str) -> tuple[bytes, str] | None:
+    """Pull a fresh GIF matching `query` from Giphy's search API — no
     hardcoded URL list to maintain, and it genuinely rotates since we pick
     from Giphy's live results rather than a fixed pool."""
     try:
         r = requests.get(
             "https://api.giphy.com/v1/gifs/search",
-            params={"api_key": GIPHY_API_KEY, "q": "Shohei Ohtani", "limit": 25, "rating": "pg"},
+            params={"api_key": GIPHY_API_KEY, "q": query, "limit": 25, "rating": "pg"},
             timeout=TIMEOUT,
         )
         r.raise_for_status()
@@ -360,7 +390,7 @@ def fetch_shohei_meme(date: str) -> tuple[tuple[bytes, str], tuple[str, str] | N
     a text-only placeholder. Returns (image, caption) where caption is
     None for a real Giphy GIF, or the (top, bottom) overlay text for the
     photo fallback."""
-    gif = _fetch_giphy_meme(date)
+    gif = _fetch_giphy_gif(date, "Shohei Ohtani")
     if gif:
         return gif, None
     photo = _fetch_from_pool(date + "-meme-fallback", SHOHEI_PHOTOS)
@@ -371,6 +401,23 @@ def fetch_shohei_meme(date: str) -> tuple[tuple[bytes, str], tuple[str, str] | N
 
 def pick_fallback_meme_line(date: str) -> str:
     return random.Random(date + "-fallback-meme").choice(FALLBACK_MEME_LINES)
+
+
+def fetch_daily_meme(date: str) -> tuple[tuple[bytes, str] | None, tuple[str, str] | None, str]:
+    """Top-level meme picker: a special-occasion GIF (New Year, birthdays,
+    Chinese New Year, etc.) takes priority over the regular Shohei meme.
+    Returns (image_or_None, photo_caption_overlay_or_None, fallback_text_line)."""
+    d = datetime.strptime(date, "%Y-%m-%d").date()
+    occasion = get_special_occasion(d)
+    if occasion:
+        query, fallback_line = occasion
+        gif = _fetch_giphy_gif(date + "-occasion", query)
+        return gif, None, fallback_line
+    result = fetch_shohei_meme(date)
+    if result:
+        image, caption = result
+        return image, caption, pick_fallback_meme_line(date)
+    return None, None, pick_fallback_meme_line(date)
 
 
 def meme_html(has_meme: bool, caption: tuple[str, str] | None, fallback_line: str) -> str:
@@ -580,15 +627,14 @@ def main() -> None:
     nba_games = None if is_nba_offseason(date) else safe_fetch(fetch_nba, date)
     news = fetch_news()
     photo = fetch_shohei_photo(date)
-    meme_result = fetch_shohei_meme(date)
-    meme, meme_caption = meme_result if meme_result else (None, None)
+    meme, meme_caption, fallback_meme_line = fetch_daily_meme(date)
     text_body = build_text(date, mlb_games, nba_games, news)
     html_body = build_html(
         date, mlb_games, nba_games, news,
         has_photo=photo is not None,
         has_meme=meme is not None,
         meme_caption=meme_caption,
-        fallback_meme_line=pick_fallback_meme_line(date),
+        fallback_meme_line=fallback_meme_line,
     )
 
     if os.environ.get("DRY_RUN") == "1":
