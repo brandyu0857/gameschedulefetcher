@@ -7,6 +7,7 @@ import os
 import random
 import smtplib
 import ssl
+import time
 import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import date as date_cls
@@ -53,8 +54,31 @@ def make_game(away: str, home: str, time: str, separator: str = "@", featured: b
     return {"away": away, "home": home, "time": time, "separator": separator, "featured": featured, "series": series}
 
 
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+
+
+def _get_with_retry(url: str, retries: int = 3, backoff: float = 1.5) -> requests.Response:
+    """GET with exponential backoff on transient errors (connection issues,
+    timeouts, and 5xx/429 responses) — the news RSS feed in particular has
+    been observed to intermittently return 503."""
+    last_exc: Exception | None = None
+    for attempt in range(retries):
+        try:
+            r = requests.get(url, timeout=TIMEOUT, headers=HEADERS)
+            if r.status_code in RETRYABLE_STATUS_CODES and attempt < retries - 1:
+                time.sleep(backoff * (2 ** attempt))
+                continue
+            return r
+        except requests.RequestException as e:
+            last_exc = e
+            if attempt < retries - 1:
+                time.sleep(backoff * (2 ** attempt))
+                continue
+    raise last_exc  # type: ignore[misc]
+
+
 def _get_json(url: str) -> dict:
-    r = requests.get(url, timeout=TIMEOUT, headers=HEADERS)
+    r = _get_with_retry(url)
     r.raise_for_status()
     try:
         return r.json()
@@ -165,7 +189,7 @@ def fetch_news() -> List[NewsItem] | str:
         q = urllib.parse.quote(topic)
         url = f"https://news.google.com/rss/search?q={q}&hl=en-CA&gl=CA&ceid=CA:en"
         try:
-            r = requests.get(url, timeout=TIMEOUT, headers=HEADERS)
+            r = _get_with_retry(url)
             r.raise_for_status()
             root = ET.fromstring(r.content)
             for item in root.findall("./channel/item"):
@@ -431,7 +455,7 @@ def meme_html(has_meme: bool, caption: tuple[str, str] | None, fallback_line: st
         )
     img_tag = (
         f'<img src="cid:{SHOHEI_MEME_CID}" width="320" '
-        'style="display:block;width:100%;height:auto;border-radius:6px;" alt="Shohei meme"/>'
+        'style="display:block;width:100%;height:auto;border-radius:6px;" alt="Shohei funny meme"/>'
     )
     if caption is None:
         return f'<div style="max-width:320px;margin:16px auto 0;line-height:0;">{img_tag}</div>'
