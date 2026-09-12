@@ -372,20 +372,46 @@ def pick_meme_caption(date: str) -> tuple[str, str]:
     return random.Random(date + "-caption").choice(MEME_CAPTIONS)
 
 
-def _fetch_giphy_gif(date: str, query: str) -> tuple[bytes, str] | None:
-    """Pull a fresh GIF matching `query` from Giphy's search API — no
-    hardcoded URL list to maintain, and it genuinely rotates since we pick
-    from Giphy's live results rather than a fixed pool."""
+# Rotated daily so we're not always querying the exact same phrase — Giphy's
+# search ranks by relevance, so a fixed query returns nearly the same top
+# results every day regardless of shuffling; different phrasings pull from
+# genuinely different result sets.
+MEME_QUERIES = [
+    "Shohei Ohtani",
+    "Shohei Ohtani home run",
+    "Shohei Ohtani MVP",
+    "Shohei Ohtani Dodgers",
+    "Shohei Ohtani celebration",
+    "Ohtani pitching",
+    "Ohtani baseball",
+]
+
+
+def _giphy_search(query: str, offset: int) -> list:
     try:
         r = requests.get(
             "https://api.giphy.com/v1/gifs/search",
-            params={"api_key": GIPHY_API_KEY, "q": query, "limit": 25, "rating": "pg"},
+            params={"api_key": GIPHY_API_KEY, "q": query, "limit": 25, "offset": offset, "rating": "pg"},
             timeout=TIMEOUT,
         )
         r.raise_for_status()
-        results = r.json().get("data", [])
+        return r.json().get("data", [])
     except Exception:
-        return None
+        return []
+
+
+def _fetch_giphy_gif(date: str, query: str) -> tuple[bytes, str] | None:
+    """Pull a fresh GIF matching `query` from Giphy's search API — no
+    hardcoded URL list to maintain. Also picks a random offset into the
+    result set (seeded per day) instead of always requesting the top page:
+    for a fixed query, relevance-ranked search returns nearly the same
+    top-25 every time, so shuffling within just that page barely varies
+    day to day — a different offset actually reaches different GIFs."""
+    offset = random.Random(date + "-offset").randint(0, 150)
+    results = _giphy_search(query, offset)
+    if not results:
+        # offset likely landed past the end of this query's results — retry from the start
+        results = _giphy_search(query, 0)
     if not results:
         return None
     order = random.Random(date + "-meme").sample(results, len(results))
@@ -414,7 +440,8 @@ def fetch_shohei_meme(date: str) -> tuple[tuple[bytes, str], tuple[str, str] | N
     a text-only placeholder. Returns (image, caption) where caption is
     None for a real Giphy GIF, or the (top, bottom) overlay text for the
     photo fallback."""
-    gif = _fetch_giphy_gif(date, "Shohei Ohtani")
+    query = random.Random(date + "-query").choice(MEME_QUERIES)
+    gif = _fetch_giphy_gif(date, query)
     if gif:
         return gif, None
     photo = _fetch_from_pool(date + "-meme-fallback", SHOHEI_PHOTOS)
