@@ -382,6 +382,10 @@ MEME_QUERIES = [
     "Shohei Ohtani MVP",
     "Shohei Ohtani Dodgers",
     "Shohei Ohtani celebration",
+    "Shohei Ohtani funny",
+    "Shohei Ohtani blooper",
+    "Shohei Ohtani fail",
+    "Shohei Ohtani laughing",
     "Ohtani pitching",
     "Ohtani baseball",
 ]
