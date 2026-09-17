@@ -325,7 +325,7 @@ def _fetch_from_pool(seed: str, pool: List[str]) -> tuple[bytes, str] | None:
 
 
 def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
-    return _fetch_from_pool(date, SHOHEI_PHOTOS)
+    return _fetch_giphy_gif(date + "-photo", "Shohei Ohtani funny")
 
 
 MEME_RENDITIONS = ["fixed_width", "downsized", "fixed_height", "original"]
