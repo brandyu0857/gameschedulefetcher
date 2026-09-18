@@ -324,8 +324,16 @@ def _fetch_from_pool(seed: str, pool: List[str]) -> tuple[bytes, str] | None:
     return None
 
 
+SHOHEI_HEADSHOTS = [
+    "https://a.espncdn.com/i/headshots/mlb/players/full/3988595.png",
+    _commons_photo("Shohei_Ohtani_-_Los_Angeles_Dodgers_(2024).jpg"),
+    _commons_photo("Shohei_Ohtani_2023_WBC.jpg"),
+    _commons_photo("Shohei_Ohtani_on_April_23,_2024_(2)_53677091634.jpg"),
+]
+
+
 def fetch_shohei_photo(date: str) -> tuple[bytes, str] | None:
-    return _fetch_giphy_gif(date + "-photo", "Shohei Ohtani funny")
+    return _fetch_from_pool(date, SHOHEI_HEADSHOTS)
 
 
 MEME_RENDITIONS = ["fixed_width", "downsized", "fixed_height", "original"]
@@ -414,7 +422,7 @@ def fetch_shohei_meme(date: str) -> tuple[tuple[bytes, str], tuple[str, str] | N
     a text-only placeholder. Returns (image, caption) where caption is
     None for a real Giphy GIF, or the (top, bottom) overlay text for the
     photo fallback."""
-    gif = _fetch_giphy_gif(date, "Shohei Ohtani")
+    gif = _fetch_giphy_gif(date, "Shohei Ohtani funny")
     if gif:
         return gif, None
     photo = _fetch_from_pool(date + "-meme-fallback", SHOHEI_PHOTOS)
