@@ -22,7 +22,7 @@ from lunardate import LunarDate
 
 TIMEOUT = 15
 FEATURED_MLB_TEAMS = {"Toronto Blue Jays", "Los Angeles Dodgers"}
-NO_GAME = "No game happens today"
+NO_GAME = "See you next season!"
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
