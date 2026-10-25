@@ -234,6 +234,26 @@ def safe_fetch(fn: Callable[[str], List[Game]], date: str) -> List[Game] | str:
         return f"(error fetching: {e})"
 
 
+def is_mlb_offseason(date: str) -> bool:
+    """True before the first game of the year or once every remaining game is final."""
+    year = date[:4]
+    url = (
+        f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&startDate={year}-01-01&endDate={year}-12-31"
+        "&fields=dates,date,games,status,abstractGameState"
+    )
+    try:
+        days = _get_json(url).get("dates", [])
+    except Exception:
+        return False
+    if not days or date < min(d["date"] for d in days):
+        return True
+    return all(
+        g.get("status", {}).get("abstractGameState") == "Final"
+        for d in days if d["date"] >= date
+        for g in d.get("games", [])
+    )
+
+
 def is_nba_offseason(date: str) -> bool:
     month = int(date[5:7])
     return month in (7, 8, 9)
@@ -558,8 +578,11 @@ def news_html(
     return header + table + meme
 
 
-def build_text(date: str, mlb: List[Game] | str, nba: List[Game] | str | None, news: List[NewsItem] | str) -> str:
-    parts = [f"Today's Games — {date}", text_section("MLB", mlb), news_text(news)]
+def build_text(date: str, mlb: List[Game] | str | None, nba: List[Game] | str | None, news: List[NewsItem] | str) -> str:
+    parts = [f"Today's Games — {date}"]
+    if mlb is not None:
+        parts.append(text_section("MLB", mlb))
+    parts.append(news_text(news))
     if nba is not None:
         parts.append(text_section("NBA", nba))
     parts.append("Sent daily at 10:00 AM Toronto time.\nCurated for you. Love you! ❤️")
@@ -607,7 +630,7 @@ def html_section(title: str, games: List[Game] | str) -> str:
 
 def build_html(
     date: str,
-    mlb: List[Game] | str,
+    mlb: List[Game] | str | None,
     nba: List[Game] | str | None,
     news: List[NewsItem] | str,
     has_photo: bool = True,
@@ -615,7 +638,8 @@ def build_html(
     meme_caption: tuple[str, str] | None = None,
     fallback_meme_line: str = "",
 ) -> str:
-    body = html_section("MLB", mlb) + news_html(news, has_photo, has_meme, meme_caption, fallback_meme_line)
+    body = html_section("MLB", mlb) if mlb is not None else ""
+    body += news_html(news, has_photo, has_meme, meme_caption, fallback_meme_line)
     if nba is not None:
         body += html_section("NBA", nba)
     return (
@@ -678,7 +702,7 @@ def main() -> None:
     tz = ZoneInfo("America/Toronto")
     now = datetime.now(tz)
     date = now.strftime("%Y-%m-%d")
-    mlb_games = safe_fetch(fetch_mlb, date)
+    mlb_games = None if is_mlb_offseason(date) else safe_fetch(fetch_mlb, date)
     nba_games = None if is_nba_offseason(date) else safe_fetch(fetch_nba, date)
     news = fetch_news()
     photo = fetch_shohei_photo(date)
