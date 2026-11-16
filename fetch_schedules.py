@@ -22,6 +22,7 @@ from lunardate import LunarDate
 
 TIMEOUT = 15
 FEATURED_MLB_TEAMS = {"Toronto Blue Jays", "Los Angeles Dodgers"}
+FEATURED_NBA_TEAMS = {"Portland Trail Blazers"}
 NO_GAME = "See you next season!"
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -142,11 +143,21 @@ def _fetch_nba_cdn(date: str) -> List[Game]:
     return games
 
 
+def _prioritize_featured_nba(games: List[Game]) -> List[Game]:
+    """Move games involving a featured team (Trail Blazers) to the top,
+    keeping the original order otherwise."""
+    for g in games:
+        if g["away"] in FEATURED_NBA_TEAMS or g["home"] in FEATURED_NBA_TEAMS:
+            g["featured"] = True
+    return sorted(games, key=lambda g: not g["featured"])
+
+
 def fetch_nba(date: str) -> List[Game]:
     try:
-        return _fetch_nba_espn(date)
+        games = _fetch_nba_espn(date)
     except Exception:
-        return _fetch_nba_cdn(date)
+        games = _fetch_nba_cdn(date)
+    return _prioritize_featured_nba(games)
 
 
 def fetch_world_cup(date: str) -> List[Game]:
